@@ -106,6 +106,36 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <div class="form-group">
+                        <label for="full-reindex-timeout" class="control-label col-xs-10">{{ text_full_reindex_timeout }}</label>
+                        <div class="col-xs-2">
+                            <div class="input-group">
+                                <input id="full-reindex-timeout" name="full-reindex-timeout"
+                                       placeholder="{{ full_reindex_timeout_placeholder }}"
+                                       type="number"
+                                       min="1"
+                                       max="408" step="1"
+                                       class="form-control"
+                                       value="{% if config['full-reindex-timeout'] is defined  %}{{ config['full-reindex-timeout'] }}{% else %}24{% endif %}">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="fast-reindex-timeout" class="control-label col-xs-10">{{ text_fast_reindex_timeout }}</label>
+                        <div class="col-xs-2">
+                            <div class="input-group">
+                                <input id="fast-reindex-timeout" name="fast-reindex-timeout"
+                                       placeholder="{{ full_reindex_timeout_placeholder }}"
+                                       type="number"
+                                       min="1"
+                                       max="24" step="1"
+                                       class="form-control"
+                                       value="{% if config['fast-reindex-timeout'] is defined  %}{{ config['fast-reindex-timeout'] }}{% else %}4{% endif %}">
+                            </div>
+                        </div>
+                    </div>
                 </form>
             
             
