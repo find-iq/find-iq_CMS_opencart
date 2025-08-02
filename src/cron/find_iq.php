@@ -16,13 +16,11 @@ if (is_file($config_file)) {
 if(is_file(DIR_SYSTEM . '/library/find_iq.php')){
     require_once(DIR_SYSTEM . '/library/find_iq.php');
 } else {
-    exit('FindIQ is not found' . PHP_EOL);
+    exit('FindIQ library not found' . PHP_EOL);
 }
 
-// Define application config
 $application_config = 'catalog'; // або 'admin', якщо потрібно завантажити конфігурацію адміністративної частини
 
-// Load required OpenCart files, but without initiating full OpenCart application
 require_once(DIR_SYSTEM . 'startup.php');
 
 $registry = new Registry();

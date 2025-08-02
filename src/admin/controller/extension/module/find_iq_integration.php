@@ -5,6 +5,9 @@ class ControllerExtensionModuleFindIqIntegration extends Controller
 
     private $error = array();
 
+    private $event_code = 'find_iq_script_connect';
+
+
     private $module_path = 'extension/module/find_iq_integration';
 
     public function index()
@@ -50,6 +53,9 @@ class ControllerExtensionModuleFindIqIntegration extends Controller
             'href' => $this->url->link($this->module_path, 'user_token=' . $this->session->data['user_token'], true)
         );
 
+        $data['download'] = $this->url->link($this->module_path . '/download', 'user_token=' . $this->session->data['user_token'], true);
+        $data['clear'] = $this->url->link($this->module_path . '/clear', 'user_token=' . $this->session->data['user_token'], true);
+
         $data['log'] = '';
 
         $file = DIR_LOGS . "find_iq_integration_cron.log";
@@ -84,9 +90,8 @@ class ControllerExtensionModuleFindIqIntegration extends Controller
         }
 
 
-        $data['module_find_iq_integration_status'] = $this->config->get('module_find_iq_integration_status');
+        $data['status'] = $this->config->get('module_find_iq_integration_status');
         $data['config'] = $this->config->get('module_find_iq_integration_config');
-
 
         $data['header'] = $this->load->controller('common/header');
         $data['column_left'] = $this->load->controller('common/column_left');
@@ -98,12 +103,14 @@ class ControllerExtensionModuleFindIqIntegration extends Controller
 
     public function install()
     {
-
+        $this->load->model('setting/event');
+        $this->model_setting_event->addEvent($this->event_code, 'catalog/view/*/before', 'tool/find_iq/addScript');
     }
 
     public function uninstall()
     {
-
+        $this->load->model('setting/event');
+        $this->model_setting_event->deleteEventByCode($this->event_code);
     }
 
     protected function validate()
@@ -113,5 +120,40 @@ class ControllerExtensionModuleFindIqIntegration extends Controller
         }
 
         return !$this->error;
+    }
+
+
+    public function download()
+    {
+        if (file_exists($this->file) && filesize($this->file) > 0) {
+            $this->response->addheader('Pragma: public');
+            $this->response->addheader('Expires: 0');
+            $this->response->addheader('Content-Description: File Transfer');
+            $this->response->addheader('Content-Type: application/octet-stream');
+            $this->response->addheader('Content-Disposition: attachment; filename="' . 'find_iq_' . date('Y-m-d_H-i-s', time()) . '.log"');
+            $this->response->addheader('Content-Transfer-Encoding: binary');
+
+            $this->response->setOutput(file_get_contents($this->file, FILE_USE_INCLUDE_PATH, null));
+        } else {
+            $this->session->data['error'] = sprintf($this->language->get('error_small_log_warning'), basename($this->file), '0B');
+
+            $this->response->redirect($this->url->link($this->module_path, 'user_token=' . $this->session->data['user_token'], true));
+        }
+    }
+
+    public function clear()
+    {
+
+        if (!$this->user->hasPermission('modify', $this->module_path)) {
+            $this->session->data['error'] = $this->language->get('error_permission');
+        } else {
+            $handle = fopen($this->file, 'w+');
+
+            fclose($handle);
+
+            $this->session->data['success'] = $this->language->get('text_success');
+        }
+
+        $this->response->redirect($this->url->link($this->module_path, 'user_token=' . $this->session->data['user_token'], true));
     }
 }
