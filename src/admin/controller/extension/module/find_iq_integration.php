@@ -105,12 +105,19 @@ class ControllerExtensionModuleFindIqIntegration extends Controller
     {
         $this->load->model('setting/event');
         $this->model_setting_event->addEvent($this->event_code, 'catalog/view/*/before', 'tool/find_iq/addScript');
+
+        $this->load->model('extension/module/find_iq_integration');
+        $this->model_extension_module_find_iq_integration->install();
     }
 
     public function uninstall()
     {
         $this->load->model('setting/event');
         $this->model_setting_event->deleteEventByCode($this->event_code);
+
+
+        $this->load->model('extension/module/find_iq_integration');
+        $this->model_extension_module_find_iq_integration->uninstall();
     }
 
     protected function validate()

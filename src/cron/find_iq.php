@@ -13,14 +13,14 @@ if (is_file($config_file)) {
     exit('Config is not found' . PHP_EOL);
 }
 
-if(is_file(DIR_SYSTEM . '/library/find_iq.php')){
-    require_once(DIR_SYSTEM . '/library/find_iq.php');
-} else {
-    exit('FindIQ library not found' . PHP_EOL);
+if (!defined('VERSION')) {
+    define('VERSION', '3.0.2.0');
 }
 
-$application_config = 'catalog'; // або 'admin', якщо потрібно завантажити конфігурацію адміністративної частини
+// Define application config
+$application_config = 'catalog';
 
+// Load required OpenCart files
 require_once(DIR_SYSTEM . 'startup.php');
 
 $registry = new Registry();
@@ -29,20 +29,81 @@ $registry = new Registry();
 $config = new Config();
 $registry->set('config', $config);
 
-// Log
-$log = new Log('find_iq_cron.log');
-$registry->set('log', $log);
-
 // Request
 $request = new Request();
 $registry->set('request', $request);
 
-// Load the settings from the database
+// --- Парсинг CLI-параметрів ---
+$get_params = [];
+$log_filename = 'find_iq_integration_cron.log';
+
+foreach ($argv as $index => $arg) {
+    if ($index === 0) continue;
+
+    // Параметр лог-файлу
+//    if (strpos($arg, '--log=') === 0) {
+//        $log_filename = substr($arg, 6);
+//        continue;
+//    }
+
+    // GET-параметри типу route=controller/action
+    if (strpos($arg, '=') !== false) {
+        parse_str($arg, $parsed);
+        $get_params = array_merge($get_params, $parsed);
+    }
+}
+
+// Передаємо GET-параметри в запит
+$request->get = array_merge($request->get, $get_params);
+
+// Перевірка на наявність route
+if (empty($request->get['route'])) {
+    exit('Error: route parameter is required. Example: php universal.php route=tool/find_iq_cron ' . PHP_EOL);
+}
+
+// Log
+$log = new Log($log_filename);
+$registry->set('log', $log);
+
+// Event
+$event = new Event($registry);
+$registry->set('event', $event);
+
+// Loader
+$loader = new Loader($registry);
+$registry->set('load', $loader);
+
+// Session
+$session = new Session('file', $registry);
+$registry->set('session', $session);
+
+// URL
+$url = new Url(HTTP_SERVER, HTTPS_SERVER);
+$registry->set('url', $url);
+
+// Cache
+$cache = new Cache('file');
+$registry->set('cache', $cache);
+
+// Response
+$response = new Response();
+$response->addHeader('Content-Type: text/html; charset=utf-8');
+$registry->set('response', $response);
+
+// Language (тимчасово, мова підтягнеться після config)
+$language = new Language('en-gb');
+$registry->set('language', $language);
+
+// Document
+$document = new Document();
+$registry->set('document', $document);
+
+// Database
 $db = new DB(DB_DRIVER, DB_HOSTNAME, DB_USERNAME, DB_PASSWORD, DB_DATABASE, DB_PORT);
 $registry->set('db', $db);
 
-// Load the settings from database
-$query = $db->query("SELECT * FROM " . DB_PREFIX . "setting WHERE store_id = '0'");
+// Load settings from DB
+$query = $db->query("SELECT * FROM `" . DB_PREFIX . "setting` WHERE `store_id` = '0'");
 foreach ($query->rows as $setting) {
     if (!$setting['serialized']) {
         $config->set($setting['key'], $setting['value']);
@@ -51,16 +112,14 @@ foreach ($query->rows as $setting) {
     }
 }
 
-// Loader
-$loader = new Loader($registry);
-$registry->set('load', $loader);
+// Reload language with actual config language
+$language = new Language($config->get('config_language'));
+$language->load($config->get('config_language'));
+$registry->set('language', $language);
 
-if(!$config->get('module_find_iq_status')){
-    return;
-}
+// Виклик контролера
+$controller = new Action($request->get['route']);
+$controller->execute($registry);
 
-$FindIQ = new FindIQ($registry);
-
-$FindIQ->makeIndex();
-
-exit;
+// Вивід
+$response->output();

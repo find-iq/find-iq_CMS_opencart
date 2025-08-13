@@ -22,6 +22,13 @@ class FindIQ
         $this->curl = curl_init();
     }
 
+    public function run()
+    {
+
+    }
+
+
+
     public function __destruct()
     {
         curl_close($this->curl);

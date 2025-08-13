@@ -70,28 +70,28 @@
                             </select>
                         </div>
                         
-                        <label class="col-xs-2 control-label" for="input-status">
-                            {{ entry_imagick_status }}
-                        </label>
-                        <div class="col-xs-4">
-                            <select name="imagick_status" id="input-imagick-status" class="form-control">
-                                {% if config.imagick_status %}
-                                    <option value="1" selected="selected">
-                                        {{ text_enabled }}
-                                    </option>
-                                    <option value="0">
-                                        {{ text_disabled }}
-                                    </option>
-                                {% else %}
-                                    <option value="1">
-                                        {{ text_enabled }}
-                                    </option>
-                                    <option value="0" selected="selected">
-                                        {{ text_disabled }}
-                                    </option>
-                                {% endif %}
-                            </select>
-                        </div>
+{#                        <label class="col-xs-2 control-label" for="input-imagick-status">#}
+{#                            {{ entry_imagick_status }}#}
+{#                        </label>#}
+{#                        <div class="col-xs-4">#}
+{#                            <select name="imagick_status" id="input-imagick-status" class="form-control">#}
+{#                                {% if config.imagick_status %}#}
+{#                                    <option value="1" selected="selected">#}
+{#                                        {{ text_enabled }}#}
+{#                                    </option>#}
+{#                                    <option value="0">#}
+{#                                        {{ text_disabled }}#}
+{#                                    </option>#}
+{#                                {% else %}#}
+{#                                    <option value="1">#}
+{#                                        {{ text_enabled }}#}
+{#                                    </option>#}
+{#                                    <option value="0" selected="selected">#}
+{#                                        {{ text_disabled }}#}
+{#                                    </option>#}
+{#                                {% endif %}#}
+{#                            </select>#}
+{#                        </div>#}
                     </div>
                     
                     <div class="form-group">
