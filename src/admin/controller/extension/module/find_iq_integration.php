@@ -89,9 +89,12 @@ class ControllerExtensionModuleFindIqIntegration extends Controller
             }
         }
 
-
         $data['status'] = $this->config->get('module_find_iq_integration_status');
         $data['config'] = $this->config->get('module_find_iq_integration_config');
+
+        foreach (['200', '400', '600'] as $size){
+            $data['resize_sizes'][$size] = sprintf($this->language->get('text_resize_pattern'), $size, $size);
+        }
 
         $data['header'] = $this->load->controller('common/header');
         $data['column_left'] = $this->load->controller('common/column_left');

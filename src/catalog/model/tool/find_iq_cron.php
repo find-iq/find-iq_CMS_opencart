@@ -2,29 +2,28 @@
 class ModelToolFindIQCron extends Model
 {
     /**
-     * Fetches a batch of product details optimized for performance by using specific SQL queries.
-     *
-     * @param array $products_list An array of product IDs to fetch data for. If empty, returns an empty array.
-     * @param int $language_id The language ID to fetch the product description in.
-     *
-     * @return array Returns an array of product details including ID, image, manufacturer, SKU, prices, and more.
+     * Отримання партії товарів із оптимізованими запитами.
+     * — Забрано віконні функції (ROW_NUMBER), сумісно з MySQL 5.7.
+     * — Агрегація рейтингу через LEFT JOIN підзапиту.
+     * — Обчислення актуальної спец-ціни через скалярний підзапит з ORDER BY ... LIMIT 1.
      */
-
-    public function getProductsBatchOptimized($products_list = array(), $language_id) {
-
+    public function getProductsBatchOptimized($products_list = array(), $language_id)
+    {
         if (empty($products_list)) {
             return [];
         }
 
-//        $current_datetime = date('Y-m-d H:i:s', floor(time() / 60) * 60);
-
+        // Округлення часу до 5 хвилин
 
         $current_datetime = date('Y-m-d H:i:s', floor(time() / (5 * 60)) * (5 * 60));
+        $current_datetime_esc = $this->db->escape($current_datetime);
 
+        // Гарантуємо лише int-значення
         $product_ids = implode(',', array_map('intval', $products_list));
+        $language_id = (int)$language_id;
 
         $sql = "
-            SELECT 
+            SELECT
                 p.product_id AS product_id_ext,
                 p.image,
                 p.manufacturer_id,
@@ -32,34 +31,36 @@ class ModelToolFindIQCron extends Model
                 p.stock_status_id,
                 p.quantity,
                 p.price,
-                ps.price AS sale_price,
+                (
+                    SELECT ps1.price
+                    FROM " . DB_PREFIX . "product_special ps1
+                    WHERE ps1.product_id = p.product_id
+                      AND (
+                        (ps1.date_start = '0000-00-00 00:00:00' OR ps1.date_start < '{$current_datetime_esc}')
+                        AND (ps1.date_end = '0000-00-00 00:00:00' OR ps1.date_end > '{$current_datetime_esc}')
+                      )
+                    ORDER BY ps1.priority ASC, ps1.price ASC
+                    LIMIT 1
+                ) AS sale_price,
                 p.status,
                 p.model,
                 p.ean,
                 p.upc,
                 p.jan,
                 p.isbn,
-                
                 pd.name,
-                (
-                    SELECT AVG(rating) 
-                    FROM " . DB_PREFIX . "review r1 
-                    WHERE r1.product_id = p.product_id AND r1.status = '1' 
-                    GROUP BY r1.product_id
-                ) AS rating
+                r.rating
             FROM " . DB_PREFIX . "product p
-            JOIN " . DB_PREFIX . "product_description pd 
-                ON (pd.product_id = p.product_id AND pd.language_id = " . (int)$language_id . ")
+            JOIN " . DB_PREFIX . "product_description pd
+                ON pd.product_id = p.product_id AND pd.language_id = {$language_id}
             LEFT JOIN (
-                SELECT 
-                    product_id,
-                    price,
-                    ROW_NUMBER() OVER (PARTITION BY product_id ORDER BY priority ASC, price ASC) AS rn
-                FROM " . DB_PREFIX . "product_special
-                WHERE 
-                    ((date_start = '0000-00-00 00:00:00' OR date_start < '" . $this->db->escape($current_datetime) . "') AND (date_end = '0000-00-00 00:00:00' OR date_end > '" . $this->db->escape($current_datetime) . "'))
-            ) ps ON p.product_id = ps.product_id AND ps.rn = 1
-            WHERE p.product_id IN (" . $product_ids . ")";
+                SELECT r1.product_id, AVG(r1.rating) AS rating
+                FROM " . DB_PREFIX . "review r1
+                WHERE r1.status = '1'
+                GROUP BY r1.product_id
+            ) r ON r.product_id = p.product_id
+            WHERE p.product_id IN (" . $product_ids . ")
+        ";
 
         $query = $this->db->query($sql);
 
@@ -67,25 +68,49 @@ class ModelToolFindIQCron extends Model
     }
 
 
-    /**
-     * Prepares a temporary table by inserting product IDs of active products
-     * that do not already exist in the find_iq_sync_products table.
-     *
-     * @return void
-     */
-    public function prepareTempTable() {
-        $this->db->query('
-            INSERT INTO ' . DB_PREFIX . 'find_iq_sync_products (product_id)
-                SELECT p.product_id
-                FROM ' . DB_PREFIX . 'product p
-                WHERE p.status = 1
-                  AND NOT EXISTS (
-                    SELECT 1
-                    FROM ' . DB_PREFIX . 'find_iq_sync_products fip
-                    WHERE fip.product_id = p.product_id
-                )
-        ');
+    public function getProductsListToSync(int $time_limit, int $limit, string $mode)
+    {
+        $time_field = ($mode === 'fast') ? 'fast_updated' : 'updated';
+        $time_limit = (int)$time_limit;
+        $limit = (int)$limit;
 
+        $table = DB_PREFIX . "find_iq_sync_products";
+        $where = "WHERE {$time_field} < {$time_limit}";
+        $order = "ORDER BY {$time_field}, product_id";
+
+        $products = $this->db->query("
+            SELECT product_id
+            FROM {$table}
+            {$where}
+            {$order}
+            LIMIT {$limit}
+        ")->rows;
+
+        $totalRow = $this->db->query("
+            SELECT COUNT(*) AS total
+            FROM {$table}
+            {$where}
+        ")->row;
+
+        return [
+            'products' => array_map('intval', array_column($products, 'product_id')),
+            'total'    => isset($totalRow['total']) ? (int)$totalRow['total'] : 0,
+        ];
     }
 
+    /**
+     * Підготовка тимчасової таблиці задач синхронізації.
+     */
+    public function prepareTempTable()
+    {
+        // ВАЖЛИВО: у таблиці "find_iq_sync_products" має бути унікальний індекс на product_id:
+        // ALTER TABLE " . DB_PREFIX . "find_iq_sync_products ADD UNIQUE KEY uq_product_id (product_id);
+
+        $this->db->query('
+            INSERT IGNORE INTO ' . DB_PREFIX . 'find_iq_sync_products (product_id)
+            SELECT p.product_id
+            FROM ' . DB_PREFIX . 'product p
+            WHERE p.status = 1
+        ');
+    }
 }
