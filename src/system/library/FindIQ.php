@@ -78,6 +78,16 @@ class FindIQ
         return $this->requestJson('GET', "/public/products/{$id}");
     }
 
+
+    /**
+     * GET /public/products/ids
+     * @param array $ids
+     * @return array Decoded JSON (product ids) or throws RuntimeException
+     */
+    public function getProductFindIqIds(array $ids){
+        return $this->requestJson('POST', '/public/products/ids', array('product_id_exts' => $ids));
+    }
+
     /**
      * POST /public/products/batch
      * @param array $products Array of product objects as associative arrays
@@ -180,7 +190,6 @@ class FindIQ
 
         $headers = [
             'X-Auth-Token: ' . $this->token,
-            'Accept: ' . ($expect_json ? 'application/json' : '*/*'),
         ];
 
         $method = strtoupper($method);

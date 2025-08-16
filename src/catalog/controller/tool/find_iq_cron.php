@@ -11,6 +11,8 @@ class ControllerToolFindIQCron extends Controller
 
         if ($this->config->get('module_find_iq_integration_status') == '1') {
 
+            $this->load->library('FindIQ');
+
             $this->now = (new DateTime())->getTimestamp();
 
             $mode = $this->request->get['mode'] ?? 'fast';
@@ -28,31 +30,93 @@ class ControllerToolFindIQCron extends Controller
                 $offset_hours = $config['full_reindex_timeout'] ?? 24;
             }
 
-            $have_products_to_update = false;
-
-            $to_update = $this->getProductsListToSync($mode, 10, $offset_hours);
-
-            $have_products_to_update = count($to_update['products']) > 0;
-
-            if (!$have_products_to_update) {
-                exit('no products to update');
+            // Streaming mode detection (SSE)
+            $is_stream = false;
+            if (isset($this->request->get['stream']) && (int)$this->request->get['stream'] === 1) {
+                $is_stream = true;
+            } elseif (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'text/event-stream') !== false) {
+                $is_stream = true;
             }
 
+            $processed = 0;
+            $initial_info = $this->getProductsListToSync($mode, 1, $offset_hours); // limit doesn't change total
+            $total = isset($initial_info['total']) ? (int)$initial_info['total'] : 0;
 
-            $products = $this->model_tool_find_iq_cron->getProductsBatchOptimized(
-                $to_update['products'],
-                1
-            );
+            if ($is_stream) {
+                // Setup headers for SSE
+                if (!headers_sent()) {
+                    header('Content-Type: text/event-stream');
+                    header('Cache-Control: no-cache');
+                    header('Connection: keep-alive');
+                    header('X-Accel-Buffering: no'); // disable Nginx buffering if used
+                }
+                @ini_set('output_buffering', 'off');
+                @ini_set('zlib.output_compression', '0');
+                @set_time_limit(0);
+                @ignore_user_abort(true);
 
-            foreach ($products as &$product) {
-                $product['image'] = $this->model_tool_image->resize($product['image'], $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
-                $product['url_product'] = $this->url->link('product/product', 'product_id=' . $product['product_id_ext']);
+                $this->sendSseEvent('start', [
+                    'mode' => $mode,
+                    'total' => $total,
+                    'batch_limit' => 100,
+                    'offset_hours' => $offset_hours,
+                ]);
             }
 
+            $have_products_to_update = true;
+            $batch_limit = 100;
 
-//            echo json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            print_r($products);
+            while ($have_products_to_update === true) {
+                $to_update = $this->getProductsListToSync($mode, $batch_limit, $offset_hours);
+                $have_products_to_update = isset($to_update['products']) && count($to_update['products']) > 0;
 
+                if (!$have_products_to_update) {
+                    break;
+                }
+
+                $products = $this->model_tool_find_iq_cron->getProductsBatchOptimized(
+                    $to_update['products']
+                );
+
+                foreach ($products as &$product) {
+                    $product['image'] = $this->model_tool_image->resize($product['image'], $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
+                    $product['url_product'] = $this->url->link('product/product', 'product_id=' . $product['product_id_ext']);
+                }
+                unset($product);
+
+                $this->FindIQ->postProductsBatch($products);
+
+                $this->model_tool_find_iq_cron->updateProductsFindIqIds($this->FindIQ->getProductFindIqIds(array_column($products, 'product_id_ext')));
+
+                $this->model_tool_find_iq_cron->markProductsAsSynced(array_column($products, 'product_id_ext'), $mode, $this->now);
+
+                $processed += count($products);
+
+                if ($is_stream) {
+                    $progress = ($total > 0) ? min(100, round(($processed / $total) * 100, 2)) : null;
+                    $this->sendSseEvent('progress', [
+                        'processed' => $processed,
+                        'last_batch' => count($products),
+                        'total' => $total,
+                        'progress' => $progress,
+                    ]);
+                }
+
+                // Optionally output progress per batch to logs
+                // echo 'Processed batch of ' . count($products) . PHP_EOL;
+            }
+
+            if ($is_stream) {
+                $this->sendSseEvent('complete', [
+                    'processed' => $processed,
+                    'total' => $total,
+                    'last_response' => $this->FindIQ->getLastResponse(),
+                ]);
+                // SSE connections should not send standard output footer
+                return;
+            }
+
+            print_r($this->FindIQ->getLastResponse());
 
         } else {
             echo 'disabled';
@@ -61,6 +125,16 @@ class ControllerToolFindIQCron extends Controller
 
     }
 
+    private function sendSseEvent(string $event, $data): void
+    {
+        // $data can be any serializable type; we encode to JSON
+        $payload = is_string($data) ? $data : json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        echo "event: {$event}\n";
+        echo "data: {$payload}\n\n";
+        // Explicitly flush output buffers
+        if (function_exists('ob_flush')) { @ob_flush(); }
+        flush();
+    }
 
     private function getProductsListToSync($mode = 'fast', $limit = 100, int $offset_hours = 2)
     {

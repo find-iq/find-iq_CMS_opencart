@@ -3,6 +3,9 @@
 class ControllerExtensionModuleFindIqIntegration extends Controller
 {
 
+    private $version = '0.1alpha';
+    private $repo = 'https://github.com/find-iq/find-iq_CMS_opencart';
+    private $file = DIR_LOGS . "find_iq_integration_cron.log";
     private $error = array();
 
     private $event_code = 'find_iq_script_connect';
@@ -95,6 +98,9 @@ class ControllerExtensionModuleFindIqIntegration extends Controller
         foreach (['200', '400', '600'] as $size){
             $data['resize_sizes'][$size] = sprintf($this->language->get('text_resize_pattern'), $size, $size);
         }
+
+        $data['text_version'] =  sprintf($this->language->get('text_version'), $this->version);
+        $data['text_src'] = sprintf($this->language->get('text_src'), $this->repo);
 
         $data['header'] = $this->load->controller('common/header');
         $data['column_left'] = $this->load->controller('common/column_left');

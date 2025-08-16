@@ -44,87 +44,99 @@
                 </h3>
             </div>
             <div class="panel-body">
-                <form action="{{ action }}" method="post" enctype="multipart/form-data" id="form-module"
-                      class="form-horizontal">
-                    <div class="form-group">
-                        <label class="col-sm-2 control-label" for="input-status">
-                            {{ entry_status }}
-                        </label>
-                        <div class="col-sm-10">
-                            <select name="status" id="input-status" class="form-control">
-                                {% if status %}
-                                    <option value="1" selected="selected">
-                                        {{ text_enabled }}
-                                    </option>
-                                    <option value="0">
-                                        {{ text_disabled }}
-                                    </option>
-                                {% else %}
-                                    <option value="1">
-                                        {{ text_enabled }}
-                                    </option>
-                                    <option value="0" selected="selected">
-                                        {{ text_disabled }}
-                                    </option>
-                                {% endif %}
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="resize-size" class="col-sm-2 control-label">{{ text_resize }}</label>
-                        <div class="col-sm-10">
-                            <select name="resize_size" id="resize-size" class="form-control">
-                                {% for resize_size, resize_size_text in resize_sizes %}
-                                    <option value="{{ resize_size }}" {% if resize_size == config['resize_size'] %}selected{% endif %}>{{ resize_size_text }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="token" class="col-sm-2 control-label">{{ text_token }}</label>
-                        <div class="col-sm-10">
-                            <div class="input-group">
-                                <div class="input-group-addon">
-                                    <i class="fa fa-user-secret"></i>
+                <ul class="nav nav-tabs">
+                    <li class="active"><a href="#tab-settings" data-toggle="tab">{{ text_edit }}</a></li>
+                    <li><a href="#tab-website" data-toggle="tab">{{ text_docs }}</a></li>
+                </ul>
+                <div class="tab-content">
+                    <div class="tab-pane active" id="tab-settings">
+                        <form action="{{ action }}" method="post" enctype="multipart/form-data" id="form-module"
+                              class="form-horizontal" style="margin-top:15px;">
+                            <div class="form-group">
+                                <label class="col-xs-12 col-sm-3 control-label" for="input-status">
+                                    {{ entry_status }}
+                                </label>
+                                <div class="col-xs-12 col-sm-3">
+                                    <select name="status" id="input-status" class="form-control">
+                                        {% if status %}
+                                            <option value="1" selected="selected">
+                                                {{ text_enabled }}
+                                            </option>
+                                            <option value="0">
+                                                {{ text_disabled }}
+                                            </option>
+                                        {% else %}
+                                            <option value="1">
+                                                {{ text_enabled }}
+                                            </option>
+                                            <option value="0" selected="selected">
+                                                {{ text_disabled }}
+                                            </option>
+                                        {% endif %}
+                                    </select>
                                 </div>
-                                <input id="token" name="token" placeholder="{{ text_token_placeholder }}" type="text"
-                                       class="form-control" value="{{ config.token }}">
                             </div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="full-reindex-timeout" class="col-sm-2 control-label">{{ text_full_reindex_timeout }}</label>
-                        <div class="col-sm-10">
-                            <div class="input-group">
-                                <input id="full-reindex-timeout" name="full_reindex_timeout"
-                                       placeholder="{{ text_full_reindex_timeout_placeholder }}"
-                                       type="number"
-                                       min="1"
-                                       max="408" step="1"
-                                       class="form-control"
-                                       value="{% if config['full_reindex_timeout'] is defined %}{{ config['full_reindex_timeout'] }}{% else %}24{% endif %}">
+                            
+                            <div class="form-group">
+                                <label for="resize-size" class="col-xs-12 col-sm-3 control-label">{{ text_resize }}</label>
+                                <div class="col-xs-12 col-sm-3">
+                                    <select name="resize_size" id="resize-size" class="form-control">
+                                        {% for resize_size, resize_size_text in resize_sizes %}
+                                            <option value="{{ resize_size }}" {% if resize_size == config['resize_size'] %}selected{% endif %}>{{ resize_size_text }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="fast-reindex-timeout" class="col-sm-2 control-label">{{ text_fast_reindex_timeout }}</label>
-                        <div class="col-sm-10">
-                            <div class="input-group">
-                                <input id="fast-reindex-timeout" name="fast_reindex_timeout"
-                                       placeholder="{{ text_fast_reindex_timeout_placeholder }}"
-                                       type="number"
-                                       min="1"
-                                       max="24" step="1"
-                                       class="form-control"
-                                       value="{% if config['fast_reindex_timeout'] is defined %}{{ config['fast_reindex_timeout'] }}{% else %}4{% endif %}">
+                            
+                            <div class="form-group">
+                                <label for="token" class="col-xs-12 col-sm-3 control-label">{{ text_token }}</label>
+                                <div class="col-xs-12 col-sm-9">
+                                    <div class="input-group">
+                                        <div class="input-group-addon">
+                                            <i class="fa fa-user-secret"></i>
+                                        </div>
+                                        <input id="token" name="token" placeholder="{{ text_token_placeholder }}" type="text"
+                                               class="form-control" value="{{ config.token }}">
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                            
+                            <div class="form-group">
+                                <label for="full-reindex-timeout" class="col-xs-12 col-sm-9 control-label">{{ text_full_reindex_timeout }}</label>
+                                <div class="col-xs-12 col-sm-3">
+                                    <div class="input-group">
+                                        <input id="full-reindex-timeout" name="full_reindex_timeout"
+                                               placeholder="{{ text_full_reindex_timeout_placeholder }}"
+                                               type="number"
+                                               min="1"
+                                               max="408" step="1"
+                                               class="form-control"
+                                               value="{% if config['full_reindex_timeout'] is defined %}{{ config['full_reindex_timeout'] }}{% else %}24{% endif %}">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="fast-reindex-timeout" class="col-xs-12 col-sm-9 control-label">{{ text_fast_reindex_timeout }}</label>
+                                <div class="col-xs-12 col-sm-3 ">
+                                    <div class="input-group">
+                                        <input id="fast-reindex-timeout" name="fast_reindex_timeout"
+                                               placeholder="{{ text_fast_reindex_timeout_placeholder }}"
+                                               type="number"
+                                               min="1"
+                                               max="24" step="1"
+                                               class="form-control"
+                                               value="{% if config['fast_reindex_timeout'] is defined %}{{ config['fast_reindex_timeout'] }}{% else %}4{% endif %}">
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
                     </div>
-                </form>
+                    <div class="tab-pane" id="tab-website" style="padding:15px 0;">
+                        <p>{{ text_version }}</p>
+                        <p>{{ text_src }}</p>
+                    </div>
+                </div>
             
             
             </div>
