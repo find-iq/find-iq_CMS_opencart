@@ -96,6 +96,9 @@ class ControllerToolFindIQCron extends Controller
 
                 if($mode == 'full'){
                     foreach ($products as &$product) {
+
+                        $this->swapLanguageId($products);
+
                         $product['image'] = $this->model_tool_image->resize($product['image'], $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
                         $product['url_product'] = $this->url->link('product/product', 'product_id=' . $product['product_id_ext']);
 
@@ -189,19 +192,38 @@ class ControllerToolFindIQCron extends Controller
 
         $this->load->model('tool/find_iq_cron');
 
+
         $site_languages = $this->model_tool_find_iq_cron->getAllLanguages();
 
         foreach ($site_languages as  &$language){
             $language['code'] = substr($language['code'] ,0, -3);
         }
 
+        foreach ($products as &$product){
+            foreach ($product['descriptions'] as &$description){
+                foreach ($site_languages as $site_language){
+                    if($site_language['language_id'] == $description['language_id']){
+                        $description['language_id'] = $site_language['code'];
+                    }
+                }
+            }
 
-        var_dump($site_languages);
-        die;
+            foreach ($product['attributes'] as &$attribute){
+                foreach ($site_languages as $site_language){
+                    if($site_language['language_id'] == $attribute['language_id']){
+                        $attribute['language_id'] = $site_language['code'];
+                    }
+                }
+            }
 
+            foreach ($product['descriptions'] as &$description){
+                $description['language_id'] = $this->FindIQLanguages[$description['language_id']];
+            }
 
-
-
+            foreach ($product['attributes'] as &$attribute){
+                $attribute['language_id'] = $this->FindIQLanguages[$attribute['language_id']];
+            }
+        }
     }
 
     private function sendSseEvent(string $event, $data): void
