@@ -99,15 +99,6 @@ class FindIQ
         return $this->requestJson('POST', '/public/products/batch', $products);
     }
 
-    /**
-     * Convenience alias for fast update (same endpoint as batch)
-     * @param array $products
-     * @return array
-     */
-    public function changeProductsBatchFast(array $products)
-    {
-        return $this->postProductsBatch($products);
-    }
 
     /**
      * PUT /public/products/{id}
@@ -155,6 +146,9 @@ class FindIQ
     {
         $raw = $this->request($method, $path, $body, true);
         $decoded = json_decode($raw, true);
+
+
+
         if (json_last_error() !== JSON_ERROR_NONE) {
             $this->log('FindIQ: Failed to decode JSON: ' . json_last_error_msg());
             throw new RuntimeException('FindIQ API: Invalid JSON response');
@@ -199,11 +193,12 @@ class FindIQ
         if ($body !== null) {
             // Encode body as JSON if it's an array/object; if string, pass as is
             if (is_array($body) || is_object($body)) {
-                $body_str = json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $body_str = json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, JSON_PRETTY_PRINT);
                 $headers[] = 'Content-Type: application/json';
             } else {
                 $body_str = (string)$body;
             }
+
             curl_setopt($this->curl, CURLOPT_POSTFIELDS, $body_str);
         } else {
             curl_setopt($this->curl, CURLOPT_POSTFIELDS, null);

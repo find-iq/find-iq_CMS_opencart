@@ -2,6 +2,8 @@
 
 class ModelToolFindIQCron extends Model
 {
+
+    private $seopro_status;
     /**
      * Отримання партії товарів із оптимізованими запитами.
      * — Забрано віконні функції (ROW_NUMBER), сумісно з MySQL 5.7.
@@ -10,7 +12,7 @@ class ModelToolFindIQCron extends Model
      *
      * @return array
      */
-    public function getProductsBatchOptimized($products_list): array
+    public function getProductsBatchOptimized($products_list, $mode): array
     {
         if (empty($products_list)) {
             return [];
@@ -26,13 +28,12 @@ class ModelToolFindIQCron extends Model
 
         $sql = "
             SELECT
+                fp.find_iq_id AS id,
                 p.product_id AS product_id_ext,
-                p.image,
                 p.sku,
-                p.stock_status_id,
                 p.quantity,
                 p.price,
-                fp.find_iq_id AS id,
+                p.status,
                 (
                     SELECT ps1.price
                     FROM " . DB_PREFIX . "product_special ps1
@@ -43,66 +44,86 @@ class ModelToolFindIQCron extends Model
                       )
                     ORDER BY ps1.priority ASC, ps1.price ASC
                     LIMIT 1
-                ) AS sale_price,
-                p.status,
+                ) AS sale_price";
+        if ($mode === 'full'){
+            $sql .= "
+                ,
+                p.image,
+                p.stock_status_id,
                 p.model,
                 p.ean,
                 p.upc,
                 p.jan,
                 p.isbn,
                 r.rating
-            FROM " . DB_PREFIX . "product p
-            LEFT JOIN (
+            ";
+        }
+
+        $sql .= "   
+            FROM " . DB_PREFIX . "product p";
+
+        if ($mode === 'full') {
+            $sql .= "
+                LEFT JOIN (
                 SELECT r1.product_id, AVG(r1.rating) AS rating
                 FROM " . DB_PREFIX . "review r1
                 WHERE r1.status = '1'
                 GROUP BY r1.product_id
             ) r ON r.product_id = p.product_id
+            ";
+
+        }
+
+        $sql .= "
             JOIN " . DB_PREFIX . "find_iq_sync_products fp ON fp.product_id = p.product_id
             WHERE p.product_id IN (" . $product_ids . ")
         ";
 
         $products = $this->db->query($sql)->rows;
 
-        $languages = implode(',', array_map('intval', array_column($this->getAllLanguages(), 'language_id')));
+        if ($mode === 'full') {
+            $languages = implode(',', array_map('intval', array_column($this->getAllLanguages(), 'language_id')));
 
-        $products_descriptions = $this->getProductDescriptions($product_ids, $languages);
+            $products_descriptions = $this->getProductDescriptions($product_ids, $languages);
 
-        $products_manufacturers = $this->getProductManufacturers($product_ids);
+            $products_manufacturers = $this->getProductManufacturers($product_ids);
 
-        $product_attributes = $this->getProductAttributes($product_ids);
+            $product_attributes = $this->getProductAttributes($product_ids);
 
 
-        foreach ($products as &$product) {
-            foreach ($products_descriptions as $description) {
-                if ($product['product_id_ext'] == $description['product_id']) {
-                    $product['descriptions'][] = array(
-                        'language_id' => $description['language_id'],
-                        'name'        => $description['name'],
-                        'description' => $this->sanitaze($description['description'])
-                    );
+            foreach ($products as &$product) {
+                foreach ($products_descriptions as $description) {
+                    if ($product['product_id_ext'] == $description['product_id']) {
+                        $product['descriptions'][] = array(
+                            'language_id' => $description['language_id'],
+                            'name'        => $description['name'],
+                            'description' => $this->sanitaze($description['description'])
+                        );
+                    }
                 }
-            }
 
-            foreach ($products_manufacturers as $manufacturer) {
-                if ($product['product_id_ext'] == $manufacturer['product_id']) {
-                    $product['manufacturer'] = array(
-                        'id' => $manufacturer['manufacturer_id'],
-                        'name' => $manufacturer['name'],
-                    );
+                foreach ($products_manufacturers as $manufacturer) {
+                    if ($product['product_id_ext'] == $manufacturer['product_id']) {
+                        $product['manufacturer'] = array(
+                            'name' => $manufacturer['name'],
+                            'descriptions' => array()
+                        );
+                    }
                 }
-            }
-
-
-            foreach ($product_attributes as $attribute) {
-                if ($product['product_id_ext'] == $attribute['product_id']) {
-                    $product['attributes'][] = array(
-                        'attribute_group' => $attribute['attribute_group'],
-                        'attribute_name' => $attribute['attribute_name'],
-                        'value' => $attribute['value'],
-                        'language_id' => $attribute['language_id'],
-                    );
+//
+//
+                foreach ($product_attributes as $attribute) {
+                    if ($product['product_id_ext'] == $attribute['product_id']) {
+                        $product['attributes'][] = array(
+                            'attribute_group' => $attribute['attribute_group'],
+                            'attribute_name' => $attribute['attribute_name'],
+                            'value' => $attribute['value'],
+                            'language_id' => $attribute['language_id'],
+                        );
+                    }
                 }
+
+                $product['category_id'] = $this->getProductCategory($product['product_id_ext']);
             }
         }
 
@@ -234,6 +255,62 @@ class ModelToolFindIQCron extends Model
             ON p.product_id = v.product_id
         SET p.find_iq_id = v.find_iq_id
     ");
+    }
+
+
+    public function getAllCategories()
+    {
+
+        $this->seopro_status = $this->db->query("SHOW COLUMNS FROM `" . DB_PREFIX . "product_to_category` LIKE 'main_category'")->num_rows > 0;
+
+        $categories = $this->db->query("
+            SELECT 
+                c.category_id, 
+                c.parent_id,
+                cd.name,
+                cd.language_id
+            FROM " . DB_PREFIX . "category c
+            JOIN " . DB_PREFIX . "category_description cd ON cd.category_id = c.category_id
+            WHERE c.status = '1'
+        ")->rows;
+
+
+        $response = [];
+        foreach ($categories as &$category) {
+            $response[$category['category_id']] = [
+                'id' => $category['category_id'],
+                'parent_id' => $category['parent_id'],
+            ];
+        }
+
+        foreach ($categories as &$category) {
+            $response[$category['category_id']]['descriptions'][] = [
+                'language_id' => $category['language_id'],
+                'name' => $category['name'],
+            ];
+        }
+
+        return $response;
+    }
+
+    private function getProductCategory(int $product_id){
+
+        $sql = "
+        SELECT category_id
+        FROM " . DB_PREFIX . "product_to_category
+        WHERE product_id = {$product_id}
+        ORDER BY ";
+
+        if($this->seopro_status){
+            $sql .= " main_category DESC,";
+        }
+
+        $sql .= "
+        category_id DESC
+        LIMIT 1;
+        ";
+
+        return $this->db->query($sql)->row['category_id'];
     }
 
 

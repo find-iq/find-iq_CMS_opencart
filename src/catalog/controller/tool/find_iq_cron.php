@@ -4,10 +4,19 @@ class ControllerToolFindIQCron extends Controller
 {
     private $now;
 
+    private $categories;
+
+    // TODO: Ця херня має бути в паблік апі, і взагалі чого там айді, а не коди мов?
+    private $FindIQLanguages = [
+        'uk' => 1,
+        'en' => 2,
+        'ru' => 3,
+        'pl' => 4,
+        'de' => 5,
+    ];
+
     public function index()
     {
-
-        // {1: 'uk', 2: 'en', 3: 'ru', 4: 'pl', 5: 'de'}
 
         if ($this->config->get('module_find_iq_integration_status') == '1') {
 
@@ -42,6 +51,8 @@ class ControllerToolFindIQCron extends Controller
             $initial_info = $this->getProductsListToSync($mode, 1, $offset_hours); // limit doesn't change total
             $total = isset($initial_info['total']) ? (int)$initial_info['total'] : 0;
 
+            $batch_limit = 100;
+
             if ($is_stream) {
                 // Setup headers for SSE
                 if (!headers_sent()) {
@@ -58,13 +69,17 @@ class ControllerToolFindIQCron extends Controller
                 $this->sendSseEvent('start', [
                     'mode' => $mode,
                     'total' => $total,
-                    'batch_limit' => 100,
+                    'batch_limit' => $batch_limit,
                     'offset_hours' => $offset_hours,
                 ]);
             }
 
+            $this->categories = $this->model_tool_find_iq_cron->getAllCategories();
+
+
             $have_products_to_update = true;
-            $batch_limit = 100;
+            $products = [];
+
 
             while ($have_products_to_update === true) {
                 $to_update = $this->getProductsListToSync($mode, $batch_limit, $offset_hours);
@@ -75,14 +90,30 @@ class ControllerToolFindIQCron extends Controller
                 }
 
                 $products = $this->model_tool_find_iq_cron->getProductsBatchOptimized(
-                    $to_update['products']
+                    $to_update['products'],
+                    $mode
                 );
 
-                foreach ($products as &$product) {
-                    $product['image'] = $this->model_tool_image->resize($product['image'], $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
-                    $product['url_product'] = $this->url->link('product/product', 'product_id=' . $product['product_id_ext']);
+                if($mode == 'full'){
+                    foreach ($products as &$product) {
+                        $product['image'] = $this->model_tool_image->resize($product['image'], $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
+                        $product['url_product'] = $this->url->link('product/product', 'product_id=' . $product['product_id_ext']);
+
+                        foreach ($this->getCategoryPath($product['category_id']) as $categoryId){
+                            $category = $this->categories[$categoryId];
+                            $category['url'] = $this->url->link('product/category', 'path=' . $category['id']);
+                            unset($category['parent_id']);
+                            unset($category['id']);
+
+                            $product['categories'][] = $category;
+                        }
+                        unset($product['category_id']);
+                    }
+
+                    unset($product);
                 }
-                unset($product);
+
+
 
                 $this->FindIQ->postProductsBatch($products);
 
@@ -102,9 +133,13 @@ class ControllerToolFindIQCron extends Controller
                     ]);
                 }
 
+
+
                 // Optionally output progress per batch to logs
                 // echo 'Processed batch of ' . count($products) . PHP_EOL;
             }
+
+
 
             if ($is_stream) {
                 $this->sendSseEvent('complete', [
@@ -116,11 +151,55 @@ class ControllerToolFindIQCron extends Controller
                 return;
             }
 
-            print_r($this->FindIQ->getLastResponse());
+
 
         } else {
             echo 'disabled';
         }
+
+
+    }
+
+    private function getCategoryPath($categoryId) {
+        $path = [];
+        $currentId = $categoryId;
+
+        // Рекурсивно піднімаємося по ієрархії до кореневої категорії
+        while ($currentId && isset($this->categories[$currentId])) {
+            $category = $this->categories[$currentId];
+
+            // Додаємо поточний ID в початок масиву
+            array_unshift($path, $currentId);
+
+            // Якщо це коренева категорія (parent_id = 0), зупиняємося
+            if ($category['parent_id'] == '0') {
+                break;
+            }
+
+            // Переходимо до батьківської категорії
+            $currentId = $category['parent_id'];
+        }
+
+        return $path;
+    }
+
+
+    private function swapLanguageId($products)
+    {
+
+        $this->load->model('tool/find_iq_cron');
+
+        $site_languages = $this->model_tool_find_iq_cron->getAllLanguages();
+
+        foreach ($site_languages as  &$language){
+            $language['code'] = substr($language['code'] ,0, -3);
+        }
+
+
+        var_dump($site_languages);
+        die;
+
+
 
 
     }
