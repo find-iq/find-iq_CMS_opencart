@@ -239,22 +239,16 @@ class ModelToolFindIQCron extends Model
             return;
         }
 
-        $values = [];
-
         foreach ($ids['id_map'] as $product_id => $find_iq_id) {
             $product_id = (int)$product_id;
             $find_iq_id = (int)$find_iq_id;
-            $values[] = "({$product_id}, {$find_iq_id})";
+
+            $this->db->query("
+            UPDATE " . DB_PREFIX . "find_iq_sync_products 
+            SET find_iq_id = {$find_iq_id}
+            WHERE product_id = {$product_id}
+        ");
         }
-
-        $values_sql = implode(',', $values);
-
-        $this->db->query("
-        UPDATE " . DB_PREFIX . "find_iq_sync_products p
-        JOIN (VALUES {$values_sql}) AS v(product_id, find_iq_id) 
-            ON p.product_id = v.product_id
-        SET p.find_iq_id = v.find_iq_id
-    ");
     }
 
 
