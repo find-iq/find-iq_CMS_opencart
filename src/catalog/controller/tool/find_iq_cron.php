@@ -51,7 +51,7 @@ class ControllerToolFindIQCron extends Controller
             $initial_info = $this->getProductsListToSync($mode, 1, $offset_hours); // limit doesn't change total
             $total = isset($initial_info['total']) ? (int)$initial_info['total'] : 0;
 
-            $batch_limit = 100;
+            $batch_limit = 2;
 
             if ($is_stream) {
                 // Setup headers for SSE
@@ -116,7 +116,9 @@ class ControllerToolFindIQCron extends Controller
                     unset($product);
                 }
 
-
+                foreach ($products as &$product) {
+                    $product = $this->removeNullValues($product);
+                }
 
                 $this->FindIQ->postProductsBatch($products);
 
@@ -135,7 +137,6 @@ class ControllerToolFindIQCron extends Controller
                         'progress' => $progress,
                     ]);
                 }
-
 
 
                 // Optionally output progress per batch to logs
@@ -162,6 +163,19 @@ class ControllerToolFindIQCron extends Controller
 
 
     }
+
+    private function removeNullValues($array)
+    {
+        foreach ($array as $key => $value) {
+            if (is_null($value)) {
+                unset($array[$key]);
+            } elseif (is_array($value)) {
+                $array[$key] = $this->removeNullValues($value);
+            }
+        }
+        return $array;
+    }
+
 
     private function getCategoryPath($categoryId) {
         $path = [];
