@@ -137,7 +137,7 @@ class ModelToolFindIQCron extends Model
     public function getProductAttributes(string $product_ids)
     {
         return $this->db->query("
-            SELECT pa.product_id, pa.text as value, ad.name as attribute_name, agd.name as attribute_group, pa.language_id
+            SELECT DISTINCT pa.product_id, pa.text as value, ad.name as attribute_name, agd.name as attribute_group, pa.language_id
             FROM " . DB_PREFIX . "product_attribute pa
             JOIN " . DB_PREFIX . "attribute_description ad ON ad.attribute_id = pa.attribute_id AND ad.language_id = pa.language_id
             JOIN " . DB_PREFIX . "attribute a ON a.attribute_id = pa.attribute_id

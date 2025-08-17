@@ -22,6 +22,10 @@ class ControllerToolFindIQCron extends Controller
 
             $this->load->library('FindIQ');
 
+            // Dedicated cron log for per-portion timeline
+            $cron_log = new Log('find_iq_integration_cron.log');
+            $run_id = 'run-' . date('Ymd\THis') . '-' . substr(uniqid('', true), -6);
+
             $this->now = (new DateTime())->getTimestamp();
 
             $mode = $this->request->get['mode'] ?? 'fast';
@@ -51,7 +55,9 @@ class ControllerToolFindIQCron extends Controller
             $initial_info = $this->getProductsListToSync($mode, 1, $offset_hours); // limit doesn't change total
             $total = isset($initial_info['total']) ? (int)$initial_info['total'] : 0;
 
-            $batch_limit = 2;
+            // Parallel sending of fixed-size batches
+            $batch_size = 100; // items per batch (API batch size)
+            $parallel_batches = 4; // how many batches to send in parallel
 
             if ($is_stream) {
                 // Setup headers for SSE
@@ -69,7 +75,8 @@ class ControllerToolFindIQCron extends Controller
                 $this->sendSseEvent('start', [
                     'mode' => $mode,
                     'total' => $total,
-                    'batch_limit' => $batch_limit,
+                    'batch_size' => $batch_size,
+                    'parallel_batches' => $parallel_batches,
                     'offset_hours' => $offset_hours,
                 ]);
             }
@@ -82,7 +89,9 @@ class ControllerToolFindIQCron extends Controller
 
 
             while ($have_products_to_update === true) {
-                $to_update = $this->getProductsListToSync($mode, $batch_limit, $offset_hours);
+                $desired = $batch_size * $parallel_batches;
+                $request_limit = ($mode === 'fast') ? max(1, (int)ceil($desired / 10)) : $desired;
+                $to_update = $this->getProductsListToSync($mode, $request_limit, $offset_hours);
                 $have_products_to_update = isset($to_update['products']) && count($to_update['products']) > 0;
 
                 if (!$have_products_to_update) {
@@ -120,11 +129,88 @@ class ControllerToolFindIQCron extends Controller
                     $product = $this->removeNullValues($product);
                 }
 
-                $this->FindIQ->postProductsBatch($products);
+                $forming_started_ts = microtime(true);
+                $chunks = array_chunk($products, $batch_size);
+                if (count($chunks) > $parallel_batches) {
+                    $chunks = array_slice($chunks, 0, $parallel_batches);
+                }
 
-                $this->model_tool_find_iq_cron->updateProductsFindIqIds($this->FindIQ->getProductFindIqIds(array_column($products, 'product_id_ext')));
+                // Log per-portion forming and ready states
+                $portion_count = count($chunks) > 0 ? count($chunks) : 1;
+                if ($portion_count > 1) {
+                    foreach ($chunks as $idx => $chunk) {
+                        // forming started (for this portion)
+                        $cron_log->write(json_encode([
+                            'event' => 'portion_forming_started',
+                            'run_id' => $run_id,
+                            'portion_index' => $idx + 1,
+                            'portion_count' => $portion_count,
+                            'batch_size' => count($chunk),
+                            'time_iso' => date('c', (int)$forming_started_ts),
+                            'time_unix_ms' => (int)round($forming_started_ts * 1000),
+                        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                        // ready to send
+                        $ready_ts = microtime(true);
+                        $cron_log->write(json_encode([
+                            'event' => 'portion_ready_to_send',
+                            'run_id' => $run_id,
+                            'portion_index' => $idx + 1,
+                            'portion_count' => $portion_count,
+                            'batch_size' => count($chunk),
+                            'time_iso' => date('c'),
+                            'time_unix_ms' => (int)round($ready_ts * 1000),
+                            'delta_ms_since_forming' => (int)round(($ready_ts - $forming_started_ts) * 1000),
+                        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                    }
+                } else {
+                    // Single portion in this iteration (no parallel split)
+                    $cron_log->write(json_encode([
+                        'event' => 'portion_forming_started',
+                        'run_id' => $run_id,
+                        'portion_index' => 1,
+                        'portion_count' => 1,
+                        'batch_size' => count($products),
+                        'time_iso' => date('c', (int)$forming_started_ts),
+                        'time_unix_ms' => (int)round($forming_started_ts * 1000),
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                    $ready_ts = microtime(true);
+                    $cron_log->write(json_encode([
+                        'event' => 'portion_ready_to_send',
+                        'run_id' => $run_id,
+                        'portion_index' => 1,
+                        'portion_count' => 1,
+                        'batch_size' => count($products),
+                        'time_iso' => date('c'),
+                        'time_unix_ms' => (int)round($ready_ts * 1000),
+                        'delta_ms_since_forming' => (int)round(($ready_ts - $forming_started_ts) * 1000),
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                }
 
-                $this->model_tool_find_iq_cron->markProductsAsSynced(array_column($products, 'product_id_ext'), $mode, $this->now);
+                if (empty($chunks)) {
+                    $chunks = [$products];
+                }
+                // Always use multi-sender, even for a single portion
+                $this->FindIQ->postProductsBatchMulti($chunks);
+
+                $can_mark_synced = false;
+                try {
+                    $ids_map = $this->FindIQ->getProductFindIqIds(array_column($products, 'product_id_ext'));
+                    $this->model_tool_find_iq_cron->updateProductsFindIqIds($ids_map);
+                    $can_mark_synced = true;
+                } catch (Exception $e) {
+                    // Log and skip marking synced for this iteration; continue processing
+                    if (isset($cron_log)) {
+                        $cron_log->write(json_encode([
+                            'event' => 'mapping_failed',
+                            'error' => $e->getMessage(),
+                            'time_iso' => date('c'),
+                        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                    }
+                }
+
+                if ($can_mark_synced) {
+                    $this->model_tool_find_iq_cron->markProductsAsSynced(array_column($products, 'product_id_ext'), $mode, $this->now);
+                }
 
                 $processed += count($products);
 
@@ -133,6 +219,7 @@ class ControllerToolFindIQCron extends Controller
                     $this->sendSseEvent('progress', [
                         'processed' => $processed,
                         'last_batch' => count($products),
+                        'chunks' => count($chunks),
                         'total' => $total,
                         'progress' => $progress,
                     ]);
@@ -203,41 +290,70 @@ class ControllerToolFindIQCron extends Controller
 
     private function swapLanguageId($products)
     {
+        // Ensure we have an array of products
+        if (!is_array($products) || empty($products)) {
+            return;
+        }
 
         $this->load->model('tool/find_iq_cron');
 
-
         $site_languages = $this->model_tool_find_iq_cron->getAllLanguages();
-
-        foreach ($site_languages as  &$language){
-            $language['code'] = substr($language['code'] ,0, -3);
+        if (!is_array($site_languages)) {
+            $site_languages = [];
         }
 
-        foreach ($products as &$product){
-            foreach ($product['descriptions'] as &$description){
-                foreach ($site_languages as $site_language){
-                    if($site_language['language_id'] == $description['language_id']){
-                        $description['language_id'] = $site_language['code'];
-                    }
-                }
-            }
-
-            foreach ($product['attributes'] as &$attribute){
-                foreach ($site_languages as $site_language){
-                    if($site_language['language_id'] == $attribute['language_id']){
-                        $attribute['language_id'] = $site_language['code'];
-                    }
-                }
-            }
-
-            foreach ($product['descriptions'] as &$description){
-                $description['language_id'] = $this->FindIQLanguages[$description['language_id']];
-            }
-
-            foreach ($product['attributes'] as &$attribute){
-                $attribute['language_id'] = $this->FindIQLanguages[$attribute['language_id']];
+        // Normalize site language codes (e.g., 'uk-ukr' -> 'uk')
+        foreach ($site_languages as &$language) {
+            if (isset($language['code']) && is_string($language['code'])) {
+                $language['code'] = substr($language['code'], 0, -3);
             }
         }
+        unset($language);
+
+        foreach ($products as &$product) {
+            // Descriptions: map language_id from numeric to code, then to FindIQ ID
+            if (isset($product['descriptions']) && is_array($product['descriptions'])) {
+                foreach ($product['descriptions'] as &$description) {
+                    if (isset($description['language_id'])) {
+                        // First, swap numeric site language_id -> language code
+                        foreach ($site_languages as $site_language) {
+                            if (isset($site_language['language_id']) && $site_language['language_id'] == $description['language_id']) {
+                                if (isset($site_language['code'])) {
+                                    $description['language_id'] = $site_language['code'];
+                                }
+                                break;
+                            }
+                        }
+                        // Then, map language code -> FindIQ numeric ID if available
+                        if (is_string($description['language_id']) && isset($this->FindIQLanguages[$description['language_id']])) {
+                            $description['language_id'] = $this->FindIQLanguages[$description['language_id']];
+                        }
+                    }
+                }
+                unset($description);
+            }
+
+            // Attributes: same mapping steps, but only if attributes is an array
+            if (isset($product['attributes']) && is_array($product['attributes'])) {
+                foreach ($product['attributes'] as &$attribute) {
+                    if (isset($attribute['language_id'])) {
+                        foreach ($site_languages as $site_language) {
+                            if (isset($site_language['language_id']) && $site_language['language_id'] == $attribute['language_id']) {
+                                if (isset($site_language['code'])) {
+                                    $attribute['language_id'] = $site_language['code'];
+                                }
+                                break;
+                            }
+                        }
+                        if (is_string($attribute['language_id']) && isset($this->FindIQLanguages[$attribute['language_id']])) {
+                            $attribute['language_id'] = $this->FindIQLanguages[$attribute['language_id']];
+                        }
+                    }
+                }
+                unset($attribute);
+            }
+        }
+        unset($product);
     }
 
     private function sendSseEvent(string $event, $data): void
