@@ -83,15 +83,13 @@ class ControllerToolFindIQCron extends Controller
 
             $this->categories =  $this->model_tool_find_iq_cron->getAllCategories();
 
-//            if ($mode == 'full') {
-//                $this->FindIQ->postCategoriesBatch(
-//                    $this->prepareCategoriesForSync(
-//                        $this->categories
-//                    )
-//                );
-//            }
-//
-
+            if ($mode == 'full') {
+                $this->FindIQ->postCategoriesBatch(
+                    $this->prepareCategoriesForSync(
+                        $this->categories
+                    )
+                );
+            }
 
             $have_products_to_update = true;
             $products = [];
