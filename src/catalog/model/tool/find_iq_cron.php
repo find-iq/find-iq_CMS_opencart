@@ -97,7 +97,8 @@ class ModelToolFindIQCron extends Model
                         $product['descriptions'][] = array(
                             'language_id' => $description['language_id'],
                             'name'        => $description['name'],
-                            'description' => $this->sanitaze($description['description'])
+                            'description' => $this->sanitaze($description['description']),
+                            'language_code' => $description['language_code'],
                         );
                     }
                 }
@@ -110,8 +111,7 @@ class ModelToolFindIQCron extends Model
                         );
                     }
                 }
-//
-//
+
                 foreach ($product_attributes as $attribute) {
                     if ($product['product_id_ext'] == $attribute['product_id']) {
                         $product['attributes'][] = array(
@@ -166,8 +166,9 @@ class ModelToolFindIQCron extends Model
     private function getProductDescriptions(string $product_ids, string $languages) : array
     {
         return $this->db->query("
-            SELECT  pd.product_id, pd.name, pd.description, pd.language_id
+            SELECT  pd.product_id, pd.name, pd.description, pd.language_id, l.code as language_code
             FROM " . DB_PREFIX . "product_description pd
+            JOIN " . DB_PREFIX . "language l ON pd.language_id = l.language_id
             WHERE pd.product_id IN (" . $this->db->escape($product_ids) . ") 
             AND pd.language_id IN (" . $this->db->escape($languages) . ")
         ")->rows;
@@ -258,13 +259,14 @@ class ModelToolFindIQCron extends Model
         $this->seopro_status = $this->db->query("SHOW COLUMNS FROM `" . DB_PREFIX . "product_to_category` LIKE 'main_category'")->num_rows > 0;
 
         $categories = $this->db->query("
-            SELECT 
-                c.category_id, 
-                c.parent_id,
-                cd.name,
-                cd.language_id
-            FROM " . DB_PREFIX . "category c
-            JOIN " . DB_PREFIX . "category_description cd ON cd.category_id = c.category_id
+            SELECT c.category_id,
+                   c.parent_id,
+                   cd.name,
+                   cd.language_id,
+                   l.code as language_code
+            FROM oc_category c
+                     JOIN " . DB_PREFIX . "category_description cd ON cd.category_id = c.category_id
+                     JOIN " . DB_PREFIX . "language l ON cd.language_id = l.language_id
             WHERE c.status = '1'
         ")->rows;
 
@@ -272,8 +274,8 @@ class ModelToolFindIQCron extends Model
         $response = [];
         foreach ($categories as &$category) {
             $response[$category['category_id']] = [
-                'id' => $category['category_id'],
-                'parent_id' => $category['parent_id'],
+                'category_id_ext' => $category['category_id'],
+                'parent_id_ext' => $category['parent_id'],
             ];
         }
 
@@ -281,6 +283,7 @@ class ModelToolFindIQCron extends Model
             $response[$category['category_id']]['descriptions'][] = [
                 'language_id' => $category['language_id'],
                 'name' => $category['name'],
+                'language_code' => $category['language_code'],
             ];
         }
 
@@ -304,7 +307,13 @@ class ModelToolFindIQCron extends Model
         LIMIT 1;
         ";
 
-        return $this->db->query($sql)->row['category_id'];
+        $query = $this->db->query($sql);
+
+        if($query->num_rows > 0){
+            return $query->row['category_id'];
+        } else {
+            return 0;
+        }
     }
 
 

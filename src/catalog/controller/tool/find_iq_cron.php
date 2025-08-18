@@ -81,7 +81,16 @@ class ControllerToolFindIQCron extends Controller
                 ]);
             }
 
-            $this->categories = $this->model_tool_find_iq_cron->getAllCategories();
+            $this->categories =  $this->model_tool_find_iq_cron->getAllCategories();
+
+//            if ($mode == 'full') {
+//                $this->FindIQ->postCategoriesBatch(
+//                    $this->prepareCategoriesForSync(
+//                        $this->categories
+//                    )
+//                );
+//            }
+//
 
 
             $have_products_to_update = true;
@@ -103,31 +112,36 @@ class ControllerToolFindIQCron extends Controller
                     $mode
                 );
 
-                if($mode == 'full'){
-                    foreach ($products as &$product) {
+                if ($mode == 'full') {
+                    $this->swapLanguageId($products, 'product');
 
-                        $this->swapLanguageId($products);
+                    foreach ($products as $product_key => $product) {
 
                         $product['image'] = $this->model_tool_image->resize($product['image'], $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
-                        $product['url_product'] = $this->url->link('product/product', 'product_id=' . $product['product_id_ext']);
-
-                        foreach ($this->getCategoryPath($product['category_id']) as $categoryId){
-                            $category = $this->categories[$categoryId];
-                            $category['url'] = $this->url->link('product/category', 'path=' . $category['id']);
-                            unset($category['parent_id']);
-                            unset($category['id']);
-
-                            $product['categories'][] = $category;
+                        foreach ($product['descriptions'] as $product_description_key => $description) {
+                            $this->config->set('config_language_id', $description['language_code']);
+                            $products[$product_key]['descriptions'][$product_description_key]['url'] = $this->url->link('product/product', 'product_id=' . $product['product_id_ext']);
                         }
-                        unset($product['category_id']);
+
+
+                        foreach ($this->getCategoryPath($product['category_id']) as $categoryId) {
+                            $products[$product_key]['categories'][] = (string)$categoryId;
+                        }
+                        unset($products[$product_key]['category_id']);
+
                     }
 
-                    unset($product);
+
                 }
 
-                foreach ($products as &$product) {
+                foreach ($products as $key => &$product) {
                     $product = $this->removeNullValues($product);
+                    if (empty($product['categories'])) {
+                        unset($products[$key]);
+                    }
                 }
+
+
 
                 $forming_started_ts = microtime(true);
                 $chunks = array_chunk($products, $batch_size);
@@ -225,11 +239,11 @@ class ControllerToolFindIQCron extends Controller
                     ]);
                 }
 
+//                die/
 
                 // Optionally output progress per batch to logs
                 // echo 'Processed batch of ' . count($products) . PHP_EOL;
             }
-
 
 
             if ($is_stream) {
@@ -241,7 +255,6 @@ class ControllerToolFindIQCron extends Controller
                 // SSE connections should not send standard output footer
                 return;
             }
-
 
 
         } else {
@@ -263,8 +276,23 @@ class ControllerToolFindIQCron extends Controller
         return $array;
     }
 
+    private function prepareCategoriesForSync($categories)
+    {
+        foreach ($categories as &$category) {
+            foreach ($category['descriptions'] as &$description) {
+                $this->config->set('config_language_id', $description['language_id']);
+                $description['url'] = $this->url->link('product/category', 'path=' . $category['category_id_ext']);
+                unset($description['language_code']);
+            }
+        }
 
-    private function getCategoryPath($categoryId) {
+        $this->swapLanguageId($categories, 'category');
+        return array_values($categories);
+    }
+
+
+    private function getCategoryPath($categoryId)
+    {
         $path = [];
         $currentId = $categoryId;
 
@@ -275,23 +303,23 @@ class ControllerToolFindIQCron extends Controller
             // Додаємо поточний ID в початок масиву
             array_unshift($path, $currentId);
 
-            // Якщо це коренева категорія (parent_id = 0), зупиняємося
-            if ($category['parent_id'] == '0') {
+            // Якщо це коренева категорія (parent_id_ext = 0), зупиняємося
+            if ($category['parent_id_ext'] == '0') {
                 break;
             }
 
             // Переходимо до батьківської категорії
-            $currentId = $category['parent_id'];
+            $currentId = $category['parent_id_ext'];
         }
 
         return $path;
     }
 
 
-    private function swapLanguageId($products)
+    private function swapLanguageId(&$data, $type = 'product')
     {
-        // Ensure we have an array of products
-        if (!is_array($products) || empty($products)) {
+        // Ensure we have an array of items
+        if (!is_array($data) || empty($data)) {
             return;
         }
 
@@ -302,58 +330,85 @@ class ControllerToolFindIQCron extends Controller
             $site_languages = [];
         }
 
-        // Normalize site language codes (e.g., 'uk-ukr' -> 'uk')
-        foreach ($site_languages as &$language) {
-            if (isset($language['code']) && is_string($language['code'])) {
-                $language['code'] = substr($language['code'], 0, -3);
+        // Build a fast lookup: language_id (int) -> normalized code ("en", "uk", etc.)
+        $siteLangIdToCode = [];
+        foreach ($site_languages as $lang) {
+            if (!isset($lang['language_id'])) {
+                continue;
+            }
+            $code = '';
+            if (isset($lang['code']) && is_string($lang['code'])) {
+                $c = strtolower(trim($lang['code']));
+                $parts = explode('-', $c);
+                $code = $parts[0] ?? $c;
+            }
+            $siteLangIdToCode[(string)$lang['language_id']] = $code;
+        }
+
+        // Build mapping code -> FindIQ numeric id (if exists)
+        $codeToFindIQId = [];
+        if (is_array($this->FindIQLanguages)) {
+            foreach ($this->FindIQLanguages as $code => $fid) {
+                if (!is_string($code)) continue;
+                $c = strtolower(trim($code));
+                $parts = explode('-', $c);
+                $c = $parts[0] ?? $c;
+                $codeToFindIQId[$c] = $fid;
             }
         }
-        unset($language);
 
-        foreach ($products as &$product) {
-            // Descriptions: map language_id from numeric to code, then to FindIQ ID
-            if (isset($product['descriptions']) && is_array($product['descriptions'])) {
-                foreach ($product['descriptions'] as &$description) {
-                    if (isset($description['language_id'])) {
-                        // First, swap numeric site language_id -> language code
-                        foreach ($site_languages as $site_language) {
-                            if (isset($site_language['language_id']) && $site_language['language_id'] == $description['language_id']) {
-                                if (isset($site_language['code'])) {
-                                    $description['language_id'] = $site_language['code'];
-                                }
-                                break;
-                            }
-                        }
-                        // Then, map language code -> FindIQ numeric ID if available
-                        if (is_string($description['language_id']) && isset($this->FindIQLanguages[$description['language_id']])) {
-                            $description['language_id'] = $this->FindIQLanguages[$description['language_id']];
-                        }
+        // Mapper closure: any input (int|string) -> FindIQ id if known, else normalized code
+        $mapLang = function ($value) use ($siteLangIdToCode, $codeToFindIQId) {
+            // If it's a numeric site language id, convert to code first
+            if (is_int($value) || (is_string($value) && ctype_digit($value))) {
+                $key = (string)$value;
+                if (isset($siteLangIdToCode[$key]) && $siteLangIdToCode[$key] !== '') {
+                    $value = $siteLangIdToCode[$key];
+                } else {
+                    // Unknown id: keep as-is
+                    return $value;
+                }
+            }
+
+            // If it's a string (code), normalize and then map to FindIQ id
+            if (is_string($value)) {
+                $code = strtolower(trim($value));
+                $parts = explode('-', $code);
+                $code = $parts[0] ?? $code;
+                if (isset($codeToFindIQId[$code])) {
+                    return $codeToFindIQId[$code];
+                }
+                return $code; // keep normalized code if no mapping
+            }
+
+            // Fallback: return original
+            return $value;
+        };
+
+        foreach ($data as &$row) {
+            // Descriptions: map language_id
+            if (isset($row['descriptions']) && is_array($row['descriptions'])) {
+                foreach ($row['descriptions'] as &$description) {
+                    if (array_key_exists('language_id', $description)) {
+                        $description['language_id'] = $mapLang($description['language_id']);
                     }
                 }
                 unset($description);
             }
 
-            // Attributes: same mapping steps, but only if attributes is an array
-            if (isset($product['attributes']) && is_array($product['attributes'])) {
-                foreach ($product['attributes'] as &$attribute) {
-                    if (isset($attribute['language_id'])) {
-                        foreach ($site_languages as $site_language) {
-                            if (isset($site_language['language_id']) && $site_language['language_id'] == $attribute['language_id']) {
-                                if (isset($site_language['code'])) {
-                                    $attribute['language_id'] = $site_language['code'];
-                                }
-                                break;
-                            }
-                        }
-                        if (is_string($attribute['language_id']) && isset($this->FindIQLanguages[$attribute['language_id']])) {
-                            $attribute['language_id'] = $this->FindIQLanguages[$attribute['language_id']];
+            if ($type === 'product') {
+                // Attributes: map language_id
+                if (isset($row['attributes']) && is_array($row['attributes'])) {
+                    foreach ($row['attributes'] as &$attribute) {
+                        if (array_key_exists('language_id', $attribute)) {
+                            $attribute['language_id'] = $mapLang($attribute['language_id']);
                         }
                     }
+                    unset($attribute);
                 }
-                unset($attribute);
             }
         }
-        unset($product);
+        unset($row);
     }
 
     private function sendSseEvent(string $event, $data): void
@@ -363,7 +418,9 @@ class ControllerToolFindIQCron extends Controller
         echo "event: {$event}\n";
         echo "data: {$payload}\n\n";
         // Explicitly flush output buffers
-        if (function_exists('ob_flush')) { @ob_flush(); }
+        if (function_exists('ob_flush')) {
+            @ob_flush();
+        }
         flush();
     }
 

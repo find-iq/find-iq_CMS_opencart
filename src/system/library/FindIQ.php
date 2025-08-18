@@ -107,6 +107,18 @@ class FindIQ
         return $this->requestJson('POST', '/public/products/ids', array('product_id_exts' => $ids));
     }
 
+    /**
+     * POST /public/categories/batch
+     * @param array $categories Batch of categories payloads
+     * @return array Decoded JSON response or empty array if no categories provided
+     */
+    public function postCategoriesBatch(array $categories)
+    {
+        if (empty($categories)) {
+            return [];
+        }
+        return $this->requestJson('POST', '/public/categories/batch', $categories);
+    }
 
 
     /**
@@ -238,6 +250,8 @@ class FindIQ
         ksort($responses);
         return $responses;
     }
+    
+    
 
 
     /**
