@@ -58,7 +58,7 @@ $request->get = array_merge($request->get, $get_params);
 
 // Перевірка на наявність route
 if (empty($request->get['route'])) {
-    exit('Error: route parameter is required. Example: php cron/find_iq.php route=tool/find_iq_cron action=products mode=full
+    exit('Error: route parameter is required. Example: php cron/find_iq.php route=tool/find_iq_cron actions=products mode=full
  ' . PHP_EOL);
 }
 
@@ -117,6 +117,23 @@ foreach ($query->rows as $setting) {
 $language = new Language($config->get('config_language'));
 $language->load($config->get('config_language'));
 $registry->set('language', $language);
+
+// Attach SEO URL rewrite (as in web startup) AFTER settings and language are loaded
+if ($config->get('config_seo_url')) {
+    if (class_exists('ControllerStartupSeoUrl')) {
+        $seo_url = new ControllerStartupSeoUrl($registry);
+        $url->addRewrite($seo_url);
+    } else {
+        $seo_controller_file = DIR_APPLICATION . 'controller/startup/seo_url.php';
+        if (is_file($seo_controller_file)) {
+            require_once($seo_controller_file);
+            if (class_exists('ControllerStartupSeoUrl')) {
+                $seo_url = new ControllerStartupSeoUrl($registry);
+                $url->addRewrite($seo_url);
+            }
+        }
+    }
+}
 
 // Виклик контролера
 $controller = new Action($request->get['route']);

@@ -99,17 +99,20 @@ class ControllerToolFindIQCron extends Controller
 
                     foreach ($products as $product_key => $product) {
 
-                        $products[$product_key]['image'] = $this->model_tool_image->resize($product['image'], $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
+                        if(is_file(DIR_IMAGE . $product['image'])){
+                            $products[$product_key]['image'] = $this->model_tool_image->resize($product['image'], $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
+                        } else {
+                            $products[$product_key]['image'] = $this->model_tool_image->resize('no_image.png', $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
+                        }
+
                         foreach ($product['descriptions'] as $product_description_key => $description) {
-                            $this->config->set('config_language_id', $description['language_code']);
-                            $products[$product_key]['descriptions'][$product_description_key]['url'] = $this->url->link('product/product', 'product_id=' . $product['product_id_ext']);
+                            $this->config->set('config_language_id', $description['language_id']);
+                            $products[$product_key]['descriptions'][$product_description_key]['url'] = html_entity_decode($this->url->link('product/product', 'product_id=' . $product['product_id_ext'], true));
                         }
 
+                        $products[$product_key]['categories'][] = $product['category_id'];
 
-                        foreach ($this->getCategoryPath($product['category_id']) as $categoryId) {
-                            $products[$product_key]['categories'][] = (string)$categoryId;
-                        }
-//                        unset($products[$product_key]['category_id']);
+                        unset($products[$product_key]['category_id']);
 
                     }
                     echo '=';
@@ -170,7 +173,7 @@ class ControllerToolFindIQCron extends Controller
         foreach ($categories as &$category) {
             foreach ($category['descriptions'] as &$description) {
                 $this->config->set('config_language_id', $description['language_id']);
-                $description['url'] = $this->url->link('product/category', 'path=' . $category['category_id_ext']);
+                $description['url'] = html_entity_decode($this->url->link('product/category', 'path=' . $category['category_id_ext'], true));
                 unset($description['language_code']);
             }
         }
