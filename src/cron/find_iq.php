@@ -58,7 +58,8 @@ $request->get = array_merge($request->get, $get_params);
 
 // Перевірка на наявність route
 if (empty($request->get['route'])) {
-    exit('Error: route parameter is required. Example: php universal.php route=tool/find_iq_cron ' . PHP_EOL);
+    exit('Error: route parameter is required. Example: php cron/find_iq.php route=tool/find_iq_cron action=products mode=full
+ ' . PHP_EOL);
 }
 
 // Log

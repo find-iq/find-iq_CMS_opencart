@@ -122,133 +122,16 @@ class FindIQ
 
 
     /**
-     * POST /public/products/batch in parallel for multiple portions
-     * @param array $batches Array of product arrays, each being a batch payload
-     * @return array Array of decoded JSON responses in the same order as $batches
+     * POST /public/products/batch
+     * @param array $products Batch of product payloads
+     * @return array Decoded JSON response or empty array if no products provided
      */
-    public function postProductsBatchMulti(array $batches)
+    public function postProductsBatch(array $products)
     {
-        if (empty($batches)) {
+        if (empty($products)) {
             return [];
         }
-
-        $mh = curl_multi_init();
-        $handles = [];
-        $responses = [];
-
-        $url = $this->buildUrl('/public/products/batch');
-        $headers = [
-            'X-Auth-Token: ' . $this->token,
-            'Content-Type: application/json',
-            'User-Agent: FindIQ-OpenCart-Client/1.0',
-        ];
-
-        $startTimes = [];
-        $sizes = [];
-        foreach ($batches as $idx => $batch) {
-            // Skip empty batch to avoid sending empty bodies
-            if ($batch === null || (is_array($batch) && count($batch) === 0)) {
-                $responses[$idx] = null;
-                continue;
-            }
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $this->connect_timeout);
-            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
-            curl_setopt($ch, CURLOPT_URL, $url);
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-            $body_str = is_string($batch) ? $batch : json_encode($batch, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $body_str);
-
-            $handles[$idx] = $ch;
-            curl_multi_add_handle($mh, $ch);
-
-            // logging: sending started for this portion
-            $startTimes[$idx] = microtime(true);
-            $sizes[$idx] = is_array($batch) ? count($batch) : null;
-            $this->log([
-                'event' => 'portion_sending_started',
-                'mode' => 'multi',
-                'portion_index' => $idx + 1,
-                'batch_size' => $sizes[$idx],
-                'time_iso' => date('c'),
-                'time_unix_ms' => (int)round($startTimes[$idx] * 1000),
-            ]);
-        }
-
-        // Execute all queries simultaneously, and continue when all are complete.
-        // Properly handle CURLM_CALL_MULTI_PERFORM and select(-1) cases
-        $active = null;
-        // Kickstart the transfers
-        do {
-            $mrc = curl_multi_exec($mh, $active);
-        } while ($mrc === CURLM_CALL_MULTI_PERFORM);
-
-        while ($active && $mrc === CURLM_OK) {
-            $num_ready = curl_multi_select($mh, 1.0);
-            if ($num_ready === -1) {
-                // If select returns -1, briefly sleep to avoid busy loop
-                usleep(100000); // 100ms
-            }
-            do {
-                $mrc = curl_multi_exec($mh, $active);
-            } while ($mrc === CURLM_CALL_MULTI_PERFORM);
-        }
-
-        // Collect responses
-        foreach ($handles as $idx => $ch) {
-            $raw = curl_multi_getcontent($ch);
-            $errno = curl_errno($ch);
-            $error = $errno ? curl_error($ch) : null;
-            $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-            // Store last_response only for the last finished request to keep existing semantics
-            $this->last_response = [
-                'status' => $status,
-                'headers' => [],
-                'body_raw' => $raw,
-                'error' => $error,
-            ];
-
-            if ($errno) {
-                $this->log('FindIQ: cURL multi error #' . $errno . ': ' . $error);
-                $responses[$idx] = [
-                    'error' => 'cURL error: ' . $error,
-                ];
-            } elseif ($status >= 400) {
-                $decoded = json_decode($raw, true);
-                $responses[$idx] = is_array($decoded) ? $decoded : ['error' => 'HTTP ' . $status];
-                $this->log('FindIQ: API error (multi): HTTP ' . $status);
-            } else {
-                $decoded = json_decode($raw, true);
-                $responses[$idx] = (json_last_error() === JSON_ERROR_NONE) ? $decoded : $raw;
-            }
-
-            // logging: response received for this portion
-            $end = microtime(true);
-            $this->log([
-                'event' => 'portion_response_received',
-                'mode' => 'multi',
-                'portion_index' => $idx + 1,
-                'batch_size' => $sizes[$idx] ?? null,
-                'status' => $status,
-                'error' => $error,
-                'time_iso' => date('c'),
-                'time_unix_ms' => (int)round($end * 1000),
-                'duration_ms' => isset($startTimes[$idx]) ? (int)round(($end - $startTimes[$idx]) * 1000) : null,
-            ]);
-
-            curl_multi_remove_handle($mh, $ch);
-            curl_close($ch);
-        }
-
-        curl_multi_close($mh);
-
-        // Keep order consistent with input batches
-        ksort($responses);
-        return $responses;
+        return $this->requestJson('POST', '/public/products/batch', $products);
     }
     
     
