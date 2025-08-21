@@ -192,7 +192,7 @@ class ModelToolFindIQCron extends Model
         $where = "WHERE {$time_field} < {$time_limit}";
 
         if($mode === 'full'){
-            $where .= " AND find_iq_id = 0";
+            $where .= " AND (find_iq_id = 0 OR find_iq_id IS NULL)";
         }
 
         $order = "ORDER BY {$time_field}, product_id";
