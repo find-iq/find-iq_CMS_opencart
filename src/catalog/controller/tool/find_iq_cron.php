@@ -34,6 +34,10 @@ class ControllerToolFindIQCron extends Controller
 
             $mode = $this->request->get['mode'] ?? 'fast';
 
+            // Time limit in seconds for the whole run (optional)
+            $timeLimitSeconds = (int)($this->request->get['time'] ?? 0);
+            $timeStart = time();
+
             $config = $this->config->get('module_find_iq_integration_config');
 
             $this->load->model('tool/image');
@@ -48,7 +52,8 @@ class ControllerToolFindIQCron extends Controller
             }
 
 
-            $batch_size = 100; // items per batch (API batch size)
+            // items per batch (API batch size)
+            $batch_size =  $this->request->get['batch_size'] ?? 100;
 
             $this->categories =  $this->model_tool_find_iq_cron->getAllCategories();
 
@@ -144,6 +149,12 @@ class ControllerToolFindIQCron extends Controller
 
                 // Optionally output progress per batch to logs
                  echo ' processed ' . count($products) . PHP_EOL;
+
+                // Check time limit after finishing the current batch (do not interrupt mid-operation)
+                if (!empty($timeLimitSeconds) && (time() - $timeStart) >= $timeLimitSeconds) {
+                    echo 'Time limit (' . $timeLimitSeconds . "s) reached. Stopping after current batch." . PHP_EOL;
+                    break;
+                }
             }
 
 

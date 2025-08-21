@@ -190,6 +190,11 @@ class ModelToolFindIQCron extends Model
 
         $table = DB_PREFIX . "find_iq_sync_products";
         $where = "WHERE {$time_field} < {$time_limit}";
+
+        if($mode === 'full'){
+            $where .= " AND find_iq_id = 0";
+        }
+
         $order = "ORDER BY {$time_field}, product_id";
 
         $products = $this->db->query("
