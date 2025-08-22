@@ -104,6 +104,10 @@ class ControllerToolFindIQCron extends Controller
 
                     foreach ($products as $product_key => $product) {
 
+                        if(is_null($product['id'])) {
+                            $products[$product_key]['id'] = 0;
+                        }
+
                         if(is_file(DIR_IMAGE . $product['image'])){
                             $products[$product_key]['image'] = $this->model_tool_image->resize($product['image'], $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
                         } else {
@@ -345,6 +349,8 @@ class ControllerToolFindIQCron extends Controller
         $time_limit = $this->now - ($offset_hours * 60 * 60);
 
         $this->load->model('tool/find_iq_cron');
+
+
         return $this->model_tool_find_iq_cron->getProductsListToSync($time_limit, $limit, $mode);
 
 
