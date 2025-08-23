@@ -404,4 +404,12 @@ class ModelToolFindIQCron extends Model
 
         return trim($text);
     }
+
+    public function getProductQtyData($product_id){
+        return $this->db->query("
+            SELECT f.product_id AS \"product-id\", f.find_iq_id AS \"find-iq-id\", p.quantity
+            FROM " . DB_PREFIX . "find_iq_sync_products f
+            JOIN " . DB_PREFIX . "product p ON f.product_id = p.product_id
+            WHERE f.product_id = " . (int)$product_id)->row;
+    }
 }

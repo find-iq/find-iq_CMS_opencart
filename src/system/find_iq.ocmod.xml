@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<modification>
+    <name>Find-IQ</name>
+    <code>find_iq</code>
+    <version>3.x</version>
+    <author>Mykola Hlushpenko</author>
+    <link>https://hlushpenko.top</link>
+    <file path="catalog/controller/common/header.php">
+        <operation>
+            <search><![CDATA[public function index()]]></search>
+            <add position="after"><![CDATA[
+
+        if(isset($this->request->get['route']) && $this->request->get['route'] == 'product/product' && isset($this->request->get['product_id'])){
+			$this->load->model('tool/find_iq_cron');
+
+			foreach($this->model_tool_find_iq_cron->getProductQtyData((int)$this->request->get['product_id']) as $key => $value){
+				$data['data_product'][$key] = $value;
+			}
+		}
+
+
+      ]]></add>
+        </operation>
+    </file>
+    <file path="catalog/view/theme/*/template/common/header.twig">
+        <operation>
+            <search><![CDATA[<body]]></search>
+            <add position="replace"><![CDATA[<body {% if data_product is defined %}{% for key, value in data_product %}data-{{ key }}="{{ value}}" {% endfor %}{% endif %} ]]></add>
+        </operation>
+    </file>
+</modification>
