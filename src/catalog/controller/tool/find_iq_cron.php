@@ -20,7 +20,6 @@ class ControllerToolFindIQCron extends Controller
     public function index()
     {
 
-
         if ($this->config->get('module_find_iq_integration_status') == '1') {
 
             $this->load->library('FindIQ');
@@ -53,9 +52,9 @@ class ControllerToolFindIQCron extends Controller
 
 
             // items per batch (API batch size)
-            $batch_size =  $this->request->get['batch_size'] ?? 100;
+            $batch_size = $this->request->get['batch_size'] ?? 100;
 
-            $this->categories =  $this->model_tool_find_iq_cron->getAllCategories();
+            $this->categories = $this->model_tool_find_iq_cron->getAllCategories();
 
             if ($mode == 'full' and in_array('categories', $this->actions)) {
                 $this->FindIQ->postCategoriesBatch(
@@ -65,103 +64,126 @@ class ControllerToolFindIQCron extends Controller
                 );
             }
 
-            $total = $this->getProductsListToSync($mode, 1, $offset_hours)['total'] ?? 0;
+            if ($mode == 'full' and in_array('products', $this->actions)) {
 
-            echo 'Total products to sync: ' . $total . PHP_EOL;
+                $total = $this->getProductsListToSync($mode, 1, $offset_hours)['total'] ?? 0;
 
-            $have_products_to_update = $total > 0;
+                echo 'Total products to sync: ' . $total . PHP_EOL;
 
-
-
-            $processed = 0;
-            while ($have_products_to_update === true) {
-
-                $request_limit = ($mode === 'fast') ? max(1, (int)ceil($batch_size * 10)) : $batch_size;
+                $have_products_to_update = $total > 0;
 
 
-                $to_update = $this->getProductsListToSync($mode, $request_limit, $offset_hours);
-                $have_products_to_update = isset($to_update['products']) && count($to_update['products']) > 0;
+                $processed = 0;
+                while ($have_products_to_update === true) {
 
-                if (!$have_products_to_update) {
-                    break;
-                }
-
-                echo 'start [ ' . $processed . '-' . ($processed + count($to_update['products'])) . '/' . $total .  ' ] products ';
+                    $request_limit = ($mode === 'fast') ? max(1, (int)ceil($batch_size * 10)) : $batch_size;
 
 
-                $products = $this->model_tool_find_iq_cron->getProductsBatchOptimized(
-                    $to_update['products'],
-                    $mode
-                );
+                    $to_update = $this->getProductsListToSync($mode, $request_limit, $offset_hours);
+                    $have_products_to_update = isset($to_update['products']) && count($to_update['products']) > 0;
 
-
-
-                echo '=';
-                if ($mode == 'full') {
-                    $this->swapLanguageId($products, 'product');
-
-                    echo '=';
-
-                    foreach ($products as $product_key => $product) {
-
-                        if(is_null($product['id'])) {
-                            $products[$product_key]['id'] = 0;
-                        }
-
-                        if(is_file(DIR_IMAGE . $product['image'])){
-                            $products[$product_key]['image'] = $this->model_tool_image->resize($product['image'], $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
-                        } else {
-                            $products[$product_key]['image'] = $this->model_tool_image->resize('no_image.png', $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
-                        }
-
-                        foreach ($product['descriptions'] as $product_description_key => $description) {
-                            $this->config->set('config_language_id', $description['language_id']);
-                            $products[$product_key]['descriptions'][$product_description_key]['url'] = html_entity_decode($this->url->link('product/product', 'product_id=' . $product['product_id_ext'], true));
-                        }
-
-                        $products[$product_key]['categories'][] = $product['category_id'];
-
-                        unset($products[$product_key]['category_id']);
-
+                    if (!$have_products_to_update) {
+                        break;
                     }
+
+                    echo 'start [ ' . $processed . '-' . ($processed + count($to_update['products'])) . '/' . $total . ' ] products ';
+
+
+                    $products = $this->model_tool_find_iq_cron->getProductsBatchOptimized(
+                        $to_update['products'],
+                        $mode
+                    );
+
+                    $rejected_products = [];
+
+                    foreach (array_column($products, 'product_id_ext') as $product_id){
+                        $rejected_products[$product_id] = 0;
+                    }
+
                     echo '=';
-                }
+                    if ($mode == 'full') {
+                        $this->swapLanguageId($products, 'product');
+
+                        echo '=';
+
+                        foreach ($products as $product_key => $product) {
+
+                            foreach (array_keys($product) as $field) {
+                                if (is_null($product[$field]) || $product[$field] == '' || $product[$field] == 0) {
+                                    unset($products[$product_key][$field]);
+
+                                }
+                            }
+
+                            if(empty($product['manufacturer']['descriptions'])){
+                                unset($products[$product_key]['manufacturer']['descriptions']);
+                            }
+
+                            if (is_file(DIR_IMAGE . $product['image'])) {
+                                $products[$product_key]['image'] = $this->model_tool_image->resize($product['image'], $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
+                            } else {
+                                $products[$product_key]['image'] = $this->model_tool_image->resize('no_image.png', $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
+                            }
+
+                            foreach ($product['descriptions'] as $product_description_key => $description) {
+                                $this->config->set('config_language_id', $description['language_id']);
+                                $products[$product_key]['descriptions'][$product_description_key]['url'] = html_entity_decode($this->url->link('product/product', 'product_id=' . $product['product_id_ext'], true));
+                            }
+
+                            $products[$product_key]['categories'][] = $product['category_id'];
+
+                            unset($products[$product_key]['category_id']);
+
+                            if($product['category_id'] == '0'){
+                                unset($products[$product_key]);
+                                $rejected_products[$product['product_id_ext']] = 1;
+                            }
+
+
+                        }
+                        echo '=';
+                    }
+
+
+                    echo '=';
 
 
 
 
-                echo '=';
+                    $this->FindIQ->postProductsBatch($products);
 
+                    $rejected_products = array_filter($rejected_products);
+                    if(!empty($rejected_products)){
+                        echo '=[rejected-';
+                        echo $this->model_tool_find_iq_cron->markProductsAsRejected(array_keys($rejected_products));
+                        echo ']';
+                    }
 
+                    echo '=';
 
-                $this->FindIQ->postProductsBatch($products);
+                    $this->model_tool_find_iq_cron->updateProductsFindIqIds(
+                        $this->FindIQ->getProductFindIqIds(
+                            array_values(
+                                array_column($products, 'product_id_ext')
+                            )
+                        )
+                    );
+                    echo '=';
+                    $this->model_tool_find_iq_cron->markProductsAsSynced(array_column($products, 'product_id_ext'), $mode, $this->now);
+                    echo '=';
 
+                    $processed += count($products);
 
+                    // Optionally output progress per batch to logs
+                    echo ' processed ' . count($products) . PHP_EOL;
 
-                echo '=';
-
-
-                $this->model_tool_find_iq_cron->updateProductsFindIqIds(
-                    $this->FindIQ->getProductFindIqIds(array_column($products, 'product_id_ext')
-                    )
-                );
-                echo '=';
-                $this->model_tool_find_iq_cron->markProductsAsSynced(array_column($products, 'product_id_ext'), $mode, $this->now);
-                echo '=';
-
-                $processed += count($products);
-
-                // Optionally output progress per batch to logs
-                 echo ' processed ' . count($products) . PHP_EOL;
-
-                // Check time limit after finishing the current batch (do not interrupt mid-operation)
-                if (!empty($timeLimitSeconds) && (time() - $timeStart) >= $timeLimitSeconds) {
-                    echo 'Time limit (' . $timeLimitSeconds . "s) reached. Stopping after current batch." . PHP_EOL;
-                    break;
+                    // Check time limit after finishing the current batch (do not interrupt mid-operation)
+                    if (!empty($timeLimitSeconds) && (time() - $timeStart) >= $timeLimitSeconds) {
+                        echo 'Time limit (' . $timeLimitSeconds . "s) reached. Stopping after current batch." . PHP_EOL;
+                        break;
+                    }
                 }
             }
-
-
 
 
         } else {
@@ -298,6 +320,7 @@ class ControllerToolFindIQCron extends Controller
                 foreach ($row['descriptions'] as &$description) {
                     if (array_key_exists('language_id', $description)) {
                         $description['language_id'] = $mapLang($description['language_id']);
+                        unset($description['language_code']);
                     }
                 }
                 unset($description);

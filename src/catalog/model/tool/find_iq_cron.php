@@ -96,8 +96,8 @@ class ModelToolFindIQCron extends Model
                     if ($product['product_id_ext'] == $description['product_id']) {
                         $product['descriptions'][] = array(
                             'language_id' => $description['language_id'],
-                            'name'        => $description['name'],
-                            'description' => $this->sanitaze($description['description']),
+                            'name'        => $this->sanitaze(htmlspecialchars_decode($description['name'])),
+                            'description' => $this->sanitaze( html_entity_decode(htmlspecialchars_decode($description['description']))),
                             'language_code' => $description['language_code'],
                         );
                     }
@@ -192,7 +192,7 @@ class ModelToolFindIQCron extends Model
         $where = "WHERE {$time_field} < {$time_limit}";
 
         if($mode === 'full'){
-            $where .= " AND (find_iq_id = 0 OR find_iq_id IS NULL)";
+            $where .= " AND (find_iq_id = 0 OR find_iq_id IS NULL) AND rejected = 0";
         }
 
         $order = "ORDER BY {$time_field}, product_id";
@@ -215,6 +215,21 @@ class ModelToolFindIQCron extends Model
             'products' => array_map('intval', array_column($products, 'product_id')),
             'total' => isset($totalRow['total']) ? (int)$totalRow['total'] : 0,
         ];
+    }
+
+    public function markProductsAsRejected($product_ids){
+        if (empty($product_ids)) {
+            return;
+        }
+
+        // Гарантуємо лише int-значення для безпеки
+        $product_ids_clean = array_map('intval', $product_ids);
+        $product_ids_sql = implode(',', $product_ids_clean);
+
+
+        $this->db->query("UPDATE " . DB_PREFIX . "find_iq_sync_products SET rejected = 1 WHERE product_id IN ({$product_ids_sql})");
+        return $this->db->countAffected();
+
     }
 
     public function markProductsAsSynced($product_ids, $mode, $time)
@@ -298,9 +313,10 @@ class ModelToolFindIQCron extends Model
     private function getProductCategory(int $product_id){
 
         $sql = "
-        SELECT category_id
-        FROM " . DB_PREFIX . "product_to_category
-        WHERE product_id = {$product_id}
+        SELECT p2c.category_id
+        FROM " . DB_PREFIX . "product_to_category p2c
+        JOIN "  . DB_PREFIX . "category c ON p2c.category_id = c.category_id
+        WHERE product_id = {$product_id} AND c.status = 1
         ORDER BY ";
 
         if($this->seopro_status){
@@ -357,17 +373,34 @@ class ModelToolFindIQCron extends Model
      */
     private function sanitaze($text): string
     {
+        // Гарантуємо коректну UTF-8 та прибираємо невалідні байти
+        $enc = function_exists('mb_detect_encoding') ? mb_detect_encoding($text, ['UTF-8', 'Windows-1251', 'ISO-8859-1', 'ASCII'], true) : 'UTF-8';
+        if ($enc && $enc !== 'UTF-8' && function_exists('mb_convert_encoding')) {
+            $text = mb_convert_encoding($text, 'UTF-8', $enc);
+        }
+        if (function_exists('iconv')) {
+            $tmp = @iconv('UTF-8', 'UTF-8//IGNORE', $text);
+            if ($tmp !== false) {
+                $text = $tmp;
+            }
+        }
+
         // Видаляємо HTML-теги
         $text = strip_tags($text);
 
-        // Замінюємо послідовні пробіли на один пробіл
-        $text = preg_replace('/\s+/', ' ', $text);
+        // Прибираємо керівні символи, BOM, zero-width, bidi та інші проблемні символи,
+        // а також нормалізуємо всі види пропусків (у тому числі перенос рядків) до одного пробілу
+        $text = preg_replace('/[\x{00}-\x{1F}\x{7F}\x{AD}\x{200B}-\x{200F}\x{2028}-\x{202F}\x{2066}-\x{2069}\x{FEFF}]/u', ' ', $text);
+        $text = preg_replace('/[\p{Z}]+/u', ' ', $text); // усі юнікод-пробіли -> пробіл
+
+        // Колапсуємо множинні пробіли в один
+        $text = preg_replace('/[ ]{2,}/', ' ', $text);
 
         // Залишаємо лише літери, цифри і деякі розділові знаки
         $text = preg_replace('/[^\p{L}\p{N}\s.,!?":;-]/u', '', $text);
 
-        // Видаляємо емодзі (діапазони Unicode для емодзі)
-        $text = preg_replace('/[\x{1F600}-\x{1F64F}\x{1F300}-\x{1F5FF}\x{1F680}-\x{1F6FF}\x{1F700}-\x{1F77F}\x{1F780}-\x{1F7FF}\x{1F800}-\x{1F8FF}\x{1F900}-\x{1F9FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}]/u', '', $text);
+        // Видаляємо емодзі (розширені діапазони Unicode для емодзі/піктограм)
+        $text = preg_replace('/[\x{1F000}-\x{1FAFF}\x{1FC00}-\x{1FFFF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}]/u', '', $text);
 
         return trim($text);
     }

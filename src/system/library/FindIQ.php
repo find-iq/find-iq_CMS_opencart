@@ -98,14 +98,20 @@ class FindIQ
     }
 
 
+
     /**
      * GET /public/products/ids
      * @param array $ids
      * @return array Decoded JSON (product ids) or throws RuntimeException
      */
     public function getProductFindIqIds(array $ids){
-        return $this->requestJson('POST', '/public/products/ids', array('product_id_exts' => $ids));
+        if(empty($ids)){
+            return [];
+        }
+
+        return $this->requestJson('POST', '/public/products/ids',  ['product_id_exts' =>  array_values($ids)]);
     }
+
 
     /**
      * POST /public/categories/batch
@@ -117,7 +123,7 @@ class FindIQ
         if (empty($categories)) {
             return [];
         }
-        return $this->requestJson('POST', '/public/categories/batch', $categories);
+        return $this->requestJson('POST', '/public/categories/batch', array_values($categories));
     }
 
 
@@ -131,10 +137,10 @@ class FindIQ
         if (empty($products)) {
             return [];
         }
-        return $this->requestJson('POST', '/public/products/batch', $products);
+        return $this->requestJson('POST', '/public/products/batch', array_values($products));
     }
-    
-    
+
+
 
 
     /**
@@ -260,6 +266,8 @@ class FindIQ
         curl_setopt($this->curl, CURLOPT_CONNECTTIMEOUT, $this->connect_timeout);
         curl_setopt($this->curl, CURLOPT_TIMEOUT, $this->timeout);
 
+        curl_setopt($this->curl, CURLOPT_RETURNTRANSFER, true);
+
         $attempt = 0;
         $max_attempts = 3;
         $backoff = 1; // seconds
@@ -270,6 +278,7 @@ class FindIQ
         do {
             $attempt++;
             $response = curl_exec($this->curl);
+
             $errno = curl_errno($this->curl);
             $error = $errno ? curl_error($this->curl) : null;
             $status = curl_getinfo($this->curl, CURLINFO_HTTP_CODE);
