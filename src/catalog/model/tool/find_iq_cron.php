@@ -28,7 +28,6 @@ class ModelToolFindIQCron extends Model
 
         $sql = "
             SELECT
-                fp.find_iq_id AS id,
                 p.product_id AS product_id_ext,
                 p.sku,
                 p.quantity,
@@ -189,10 +188,10 @@ class ModelToolFindIQCron extends Model
         $limit = (int)$limit;
 
         $table = DB_PREFIX . "find_iq_sync_products";
-        $where = "WHERE {$time_field} < {$time_limit}";
+        $where = "WHERE {$time_field} < {$time_limit} AND rejected = 0";
 
-        if($mode === 'full'){
-            $where .= " AND (find_iq_id = 0 OR find_iq_id IS NULL) AND rejected = 0";
+        if($mode === 'fast'){
+            $where .= " AND updated > 0";
         }
 
         $order = "ORDER BY {$time_field}, product_id";
@@ -252,24 +251,6 @@ class ModelToolFindIQCron extends Model
         SET {$updated_field} = '{$time_escaped}'
         WHERE product_id IN ({$product_ids_sql})
     ");
-    }
-
-    public function updateProductsFindIqIds($ids)
-    {
-        if (empty($ids['id_map'])) {
-            return;
-        }
-
-        foreach ($ids['id_map'] as $product_id => $find_iq_id) {
-            $product_id = (int)$product_id;
-            $find_iq_id = (int)$find_iq_id;
-
-            $this->db->query("
-            UPDATE " . DB_PREFIX . "find_iq_sync_products 
-            SET find_iq_id = {$find_iq_id}
-            WHERE product_id = {$product_id}
-        ");
-        }
     }
 
 
@@ -365,6 +346,39 @@ class ModelToolFindIQCron extends Model
         ');
     }
 
+    public function updateFrontend($frontend)
+    {
+        $store_id = 0;
+        $code = "module_find_iq_integration";
+        $key = "module_find_iq_integration_frontend";
+        $value = json_encode($frontend);
+        $serialized = 1;
+
+        // Підготуємо умову WHERE
+        $where = 'WHERE store_id = ' . (int)$store_id . ' AND `code` = "' . $this->db->escape($code) . '" AND `key` = "' . $this->db->escape($key) . '"';
+
+        // Перевірка наявності запису
+        $query = $this->db->query('
+            SELECT COUNT(*) AS count 
+            FROM ' . DB_PREFIX . 'setting 
+            ' . $where
+        );
+
+        if ((int)$query->row['count'] === 0) {
+            // Якщо запису немає — вставляємо новий
+            $this->db->query('
+                INSERT INTO ' . DB_PREFIX . 'setting (store_id, `code`, `key`, `value`, serialized)
+                VALUES (' . (int)$store_id . ', "' . $this->db->escape($code) . '", "' . $this->db->escape($key) . '", "' . $this->db->escape($value) . '", ' . (int)$serialized . ')
+            ');
+        } else {
+            // Якщо запис є — оновлюємо його
+            $this->db->query('
+                UPDATE ' . DB_PREFIX . 'setting 
+                SET `value` = "' . $this->db->escape($value) . '" 
+                ' . $where
+            );
+        }
+    }
     /**
      * Очищає текст від HTML-тегів, не UTF-8 символів та зайвих пробілів.
      *
@@ -407,7 +421,7 @@ class ModelToolFindIQCron extends Model
 
     public function getProductQtyData($product_id){
         return $this->db->query("
-            SELECT f.product_id AS \"product-id\", f.find_iq_id AS \"find-iq-id\", p.quantity
+            SELECT f.product_id AS \"product-id\", p.quantity
             FROM " . DB_PREFIX . "find_iq_sync_products f
             JOIN " . DB_PREFIX . "product p ON f.product_id = p.product_id
             WHERE f.product_id = " . (int)$product_id)->row;

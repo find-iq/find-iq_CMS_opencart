@@ -141,6 +141,21 @@ class FindIQ
     }
 
 
+    /**
+     * PUT /public/products/batch
+     * @param array $products Batch of product payloads
+     * @return array Decoded JSON response or empty array if no products provided
+     */
+    public function putProductsBatch(array $products)
+    {
+        if (empty($products)) {
+            return [];
+        }
+        return $this->requestJson('PUT', '/public/products/batch', array_values($products));
+    }
+
+
+
 
 
     /**

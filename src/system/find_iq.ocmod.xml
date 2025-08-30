@@ -11,12 +11,23 @@
             <add position="after"><![CDATA[
 
         if(isset($this->request->get['route']) && $this->request->get['route'] == 'product/product' && isset($this->request->get['product_id'])){
-			$this->load->model('tool/find_iq_cron');
+          $this->load->model('tool/find_iq_cron');
 
-			foreach($this->model_tool_find_iq_cron->getProductQtyData((int)$this->request->get['product_id']) as $key => $value){
-				$data['data_product'][$key] = $value;
-			}
-		}
+          foreach($this->model_tool_find_iq_cron->getProductQtyData((int)$this->request->get['product_id']) as $key => $value){
+            $data['data_product'][$key] = $value;
+          }
+        }
+
+        if(
+          $this->config->get('module_find_iq_integration_status') == '1'
+          &&
+          !empty($this->config->get('module_find_iq_integration_frontend'))
+        ) {
+          $frontend = $this->config->get('module_find_iq_integration_frontend');
+
+          $this->document->addStyle($frontend['css_url'] . '?' . $frontend['updated_at']);
+          $this->document->addScript($frontend['js_url'] . '?' . $frontend['updated_at']);
+        }
 
 
       ]]></add>

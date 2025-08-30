@@ -52,11 +52,15 @@ class ControllerToolFindIQCron extends Controller
 
 
             // items per batch (API batch size)
-            $batch_size = $this->request->get['batch_size'] ?? 100;
+            $batch_size = $this->request->get['batch_size'] ?? 10;
 
-            $this->categories = $this->model_tool_find_iq_cron->getAllCategories();
+            if (in_array('categories', $this->actions) || in_array('products', $this->actions)) {
+                $this->categories = $this->model_tool_find_iq_cron->getAllCategories();
+            }
 
-            if ($mode == 'full' and in_array('categories', $this->actions)) {
+
+
+            if (in_array('categories', $this->actions)) {
                 $this->FindIQ->postCategoriesBatch(
                     $this->prepareCategoriesForSync(
                         $this->categories
@@ -64,7 +68,9 @@ class ControllerToolFindIQCron extends Controller
                 );
             }
 
-            if ($mode == 'full' and in_array('products', $this->actions)) {
+
+
+            if (in_array('products', $this->actions)) {
 
                 $total = $this->getProductsListToSync($mode, 1, $offset_hours)['total'] ?? 0;
 
@@ -72,14 +78,11 @@ class ControllerToolFindIQCron extends Controller
 
                 $have_products_to_update = $total > 0;
 
-
                 $processed = 0;
+
                 while ($have_products_to_update === true) {
 
-                    $request_limit = ($mode === 'fast') ? max(1, (int)ceil($batch_size * 10)) : $batch_size;
-
-
-                    $to_update = $this->getProductsListToSync($mode, $request_limit, $offset_hours);
+                    $to_update = $this->getProductsListToSync($mode, $batch_size, $offset_hours);
                     $have_products_to_update = isset($to_update['products']) && count($to_update['products']) > 0;
 
                     if (!$have_products_to_update) {
@@ -109,9 +112,11 @@ class ControllerToolFindIQCron extends Controller
                         foreach ($products as $product_key => $product) {
 
                             foreach (array_keys($product) as $field) {
-                                if (is_null($product[$field]) || $product[$field] == '' || $product[$field] == 0) {
-                                    unset($products[$product_key][$field]);
+                                if(!in_array($field, ['quantity', ])){
 
+                                    if ($product[$field] == '' || $product[$field] == 0) {
+                                        unset($products[$product_key][$field]);
+                                    }
                                 }
                             }
 
@@ -144,13 +149,22 @@ class ControllerToolFindIQCron extends Controller
                         echo '=';
                     }
 
+                    $products = $this->removeNullValues($products);
 
                     echo '=';
 
 
 
 
-                    $this->FindIQ->postProductsBatch($products);
+
+                    if($mode == 'full'){
+                        $this->FindIQ->postProductsBatch($products);
+                    } else {
+                        $this->FindIQ->putProductsBatch($products);
+                    }
+
+
+
 
                     $rejected_products = array_filter($rejected_products);
                     if(!empty($rejected_products)){
@@ -159,15 +173,16 @@ class ControllerToolFindIQCron extends Controller
                         echo ']';
                     }
 
-                    echo '=';
+                    // echo '=';
+                    //
+                    // $this->model_tool_find_iq_cron->updateProductsFindIqIds(
+                    //     $this->FindIQ->getProductFindIqIds(
+                    //         array_values(
+                    //             array_column($products, 'product_id_ext')
+                    //         )
+                    //     )
+                    // );
 
-                    $this->model_tool_find_iq_cron->updateProductsFindIqIds(
-                        $this->FindIQ->getProductFindIqIds(
-                            array_values(
-                                array_column($products, 'product_id_ext')
-                            )
-                        )
-                    );
                     echo '=';
                     $this->model_tool_find_iq_cron->markProductsAsSynced(array_column($products, 'product_id_ext'), $mode, $this->now);
                     echo '=';
@@ -184,6 +199,23 @@ class ControllerToolFindIQCron extends Controller
                     }
                 }
             }
+
+            if (in_array('frontend', $this->actions)) {
+
+                $frontend = json_decode($this->FindIQ->getFrontendScript(), true);
+
+                if(isset($frontend['css_url']) && isset($frontend['js_url'])){
+
+                    try {
+                        $frontend['updated_at'] = (new DateTime($frontend['updated_at']))->getTimestamp();
+                    } catch (Exception $e) {
+                        $frontend['updated_at'] = $this->now;
+                    }
+
+                    $this->model_tool_find_iq_cron->updateFrontend($frontend);
+                }
+            }
+
 
 
         } else {
@@ -356,9 +388,6 @@ class ControllerToolFindIQCron extends Controller
         if ($limit < 1) {
             trigger_error('limit must be greater than 0', E_USER_ERROR);
             $limit = 100;
-        }
-        if ($mode == 'fast') {
-            $limit *= 10;
         }
 
         if (!in_array($mode, ['fast', 'full'])) {
