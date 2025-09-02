@@ -39,4 +39,31 @@
             <add position="replace"><![CDATA[<body {% if data_product is defined %}{% for key, value in data_product %}data-{{ key }}="{{ value}}" {% endfor %}{% endif %} ]]></add>
         </operation>
     </file>
+
+
+    <file path="catalog/model/catalog/product.php">
+        <operation>
+            <search><![CDATA[$query = $this->db->query("SELECT * FROM " . DB_PREFIX . "product_related]]></search>
+            <add position="after"><![CDATA[
+
+		if($query->countAffected == 0){
+
+			$query->rows = [];
+
+			$this->load->library('FindIQ');
+
+			$response = $this->FindIQ->getSearchSimilar($product_id, ['limit' => 10, 'price_spread' => 40, 'same_category' => true, 'only_avaiable' => true] );
+
+			if(!empty($response) && $response['data']['code'] == 200 && count($response['data']['data']['hits'] > 0)){
+
+			  foreach($response['data']['data']['hits'] as $hit){
+				$this->db->query('INSERT IGNORE INTO ' . DB_PREFIX . 'product_related SET product_id="'. $product_id . '", related_id = "' . $hit['product_id_ext'] . '"');
+				$query->rows[] = ['related_id' => $hit['product_id_ext']];
+			  }
+			}
+		}
+      ]]></add>
+        </operation>
+    </file>
+
 </modification>

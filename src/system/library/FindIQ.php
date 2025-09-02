@@ -20,6 +20,10 @@ class FindIQ
 
     /** @var string */
     private $base_url = 'https://panel.find-iq.com';
+
+    /** @var string */
+    private $search_base_url = 'https://api.find-iq.com/smart/';
+
     /** @var string */
     private $token = '';
 
@@ -44,7 +48,6 @@ class FindIQ
 
         $settings = $this->config->get('module_find_iq_integration_config') ?: [];
         $this->token = isset($settings['token']) ? (string)$settings['token'] : '';
-        $this->base_url = rtrim(isset($settings['base_url']) && $settings['base_url'] ? $settings['base_url'] : $this->base_url, '/');
 
         $this->curl = curl_init();
         curl_setopt($this->curl, CURLOPT_RETURNTRANSFER, true);
@@ -74,6 +77,37 @@ class FindIQ
             curl_close($this->curl);
         }
     }
+
+    // ===================== Search API methods =====================
+
+
+    public function getSearchSimilar($product_id,  $params = [])
+    {
+        return $this->searchGet('similar', array_merge(
+            ['id' => (int)$product_id],
+            $params
+        ));
+    }
+
+
+    public function getSearch($query,  $lang = 'uk', $page = 1, $category = null, $brand = null)
+    {
+        $params = [
+            'query' => $query,
+            'page' => (int)$page,
+        ];
+
+        if($category){
+            $params['category'] = $category;
+        }
+        if($brand){
+            $params['brand'] = $brand;
+        }
+
+        return $this->searchGet('fastsearch', $params);
+
+    }
+
 
     // ===================== Public API methods =====================
 
@@ -192,6 +226,76 @@ class FindIQ
     }
 
     // ===================== Internal HTTP helpers =====================
+
+
+    private function searchGet($path, $params){
+        // Build the full URL using search_base_url
+        $url = rtrim($this->search_base_url, '/') . '/' . ltrim($path, '/');
+
+
+
+
+        // Add query parameters if provided
+        if (!empty($params) && is_array($params)) {
+            $url .= '?' . http_build_query($params);
+        }
+
+
+
+
+        // Make the request using cURL directly for the search API
+        $this->resetLastResponse();
+
+        curl_setopt($this->curl, CURLOPT_URL, $url);
+        curl_setopt($this->curl, CURLOPT_CUSTOMREQUEST, 'GET');
+        curl_setopt($this->curl, CURLOPT_POSTFIELDS, null);
+
+        // Set headers including referrer from HTTPS_SERVER constant
+        $headers = [
+            'Authorization: Bearer ' . $this->token
+        ];
+
+        if (defined('HTTPS_SERVER')) {
+            $headers[] = 'Origin: ' . HTTPS_SERVER;
+        }
+
+        curl_setopt($this->curl, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($this->curl, CURLOPT_RETURNTRANSFER, true);
+
+        // Apply timeouts - 1 second as requested
+        curl_setopt($this->curl, CURLOPT_CONNECTTIMEOUT, 1);
+        curl_setopt($this->curl, CURLOPT_TIMEOUT, 1);
+
+        $response = curl_exec($this->curl);
+        $errno = curl_errno($this->curl);
+        $error = $errno ? curl_error($this->curl) : null;
+        $status = curl_getinfo($this->curl, CURLINFO_HTTP_CODE);
+
+        $this->last_response['status'] = $status;
+        $this->last_response['headers'] = [];
+        $this->last_response['body_raw'] = $response;
+        $this->last_response['error'] = $error;
+
+        // Return empty array on timeout or any error
+        if ($errno) {
+            $this->log('FindIQ Search: cURL error #' . $errno . ': ' . $error);
+            return [];
+        }
+
+        if ($status >= 400) {
+            $this->log('FindIQ Search: HTTP error ' . $status);
+            return [];
+        }
+
+        // Decode JSON response
+        $decoded = json_decode($response, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            $this->log('FindIQ Search: Failed to decode JSON: ' . json_last_error_msg());
+            return [];
+        }
+
+        return $decoded;
+    }
 
     /**
      * Perform request and decode JSON

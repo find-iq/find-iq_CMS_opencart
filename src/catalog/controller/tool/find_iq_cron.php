@@ -6,7 +6,6 @@ class ControllerToolFindIQCron extends Controller
 
     private $categories;
 
-    // TODO: Ця херня має бути в паблік апі, і взагалі чого там айді, а не коди мов?
     private $FindIQLanguages = [
         'uk' => 1,
         'en' => 2,
@@ -185,6 +184,7 @@ class ControllerToolFindIQCron extends Controller
 
                     echo '=';
                     $this->model_tool_find_iq_cron->markProductsAsSynced(array_column($products, 'product_id_ext'), $mode, $this->now);
+                    $this->model_tool_find_iq_cron->clearRelated(array_column($products, 'product_id_ext'));
                     echo '=';
 
                     $processed += count($products);
@@ -203,6 +203,8 @@ class ControllerToolFindIQCron extends Controller
             if (in_array('frontend', $this->actions)) {
 
                 $frontend = json_decode($this->FindIQ->getFrontendScript(), true);
+
+                echo "<pre>" . strip_tags(json_encode($frontend, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), '<br>') . "</pre>";
 
                 if(isset($frontend['css_url']) && isset($frontend['js_url'])){
 

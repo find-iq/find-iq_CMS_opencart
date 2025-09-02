@@ -4,6 +4,20 @@ class ModelToolFindIQCron extends Model
 {
 
     private $seopro_status;
+
+
+    public function clearRelated($products_list){
+
+        if (empty($products_list)) {
+            return [];
+        }
+
+        $this->db->query("
+            DELETE FROM " . DB_PREFIX. "product_related WHERE product_id IN (" .  implode(',', array_map('intval', $products_list)) . "
+        ");
+    }
+
+
     /**
      * Отримання партії товарів із оптимізованими запитами.
      * — Забрано віконні функції (ROW_NUMBER), сумісно з MySQL 5.7.
