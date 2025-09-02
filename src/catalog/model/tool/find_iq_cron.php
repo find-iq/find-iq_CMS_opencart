@@ -13,8 +13,7 @@ class ModelToolFindIQCron extends Model
         }
 
         $this->db->query("
-            DELETE FROM " . DB_PREFIX. "product_related WHERE product_id IN (" .  implode(',', array_map('intval', $products_list)) . "
-        ");
+            DELETE FROM " . DB_PREFIX. "product_related WHERE product_id IN (" .  implode(',', array_map('intval', $products_list)) . ")");
     }
 
 
