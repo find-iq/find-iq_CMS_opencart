@@ -104,7 +104,7 @@ class ControllerToolFindIQCron extends Controller
 
                     echo '=';
                     if ($mode == 'full') {
-                        $this->swapLanguageId($products, 'product');
+
 
                         echo '=';
 
@@ -145,16 +145,13 @@ class ControllerToolFindIQCron extends Controller
 
 
                         }
+
                         echo '=';
+                        $this->swapLanguageId($products, 'product');
                     }
 
-                    $products = $this->removeNullValues($products);
-
                     echo '=';
-
-
-
-
+                    $products = $this->removeNullValues($products);
 
                     if($mode == 'full'){
                         $this->FindIQ->postProductsBatch($products);
