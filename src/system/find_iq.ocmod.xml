@@ -52,7 +52,7 @@
 
 			$this->load->library('FindIQ');
 
-			$response = $this->FindIQ->getSearchSimilar($product_id, ['limit' => 10, 'price_spread' => 40, 'same_category' => true, 'only_avaiable' => true] );
+			$response = $this->FindIQ->getSearchSimilar($product_id, ['limit' => 10, 'price_spread' => 40, 'same_category' => true, 'only_available' => true] );
 
 			if(!empty($response) && $response['data']['code'] == 200 && count($response['data']['data']['hits'] > 0)){
 
