@@ -1,10 +1,10 @@
 <?php
 
 class ControllerApiFindIq extends Controller {
-    public function checkProductInCart(){
+    public function getProductsFromCart(){
+        $json['products_in_cart'] = $this->cart->getProductsFromCart();
+
         $this->response->addHeader('Content-Type: application/json');
-        $this->response->setOutput(json_encode(
-            ['product_in_cart' => $this->cart->checkProductInCartExistance($this->request->get['product_id'] ?? 0)]
-        ));
+        $this->response->setOutput(json_encode($json));
     }
 }

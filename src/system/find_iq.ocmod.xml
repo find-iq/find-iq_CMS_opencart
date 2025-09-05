@@ -71,8 +71,21 @@
         <operation>
             <search><![CDATA[public function getProducts()]]></search>
             <add position="before"><![CDATA[
-	public function checkProductInCartExistance($product_id){
-		return $this->db->query("SELECT * FROM " . DB_PREFIX . "cart WHERE api_id = '" . (isset($this->session->data['api_id']) ? (int)$this->session->data['api_id'] : 0) . "' AND customer_id = '" . (int)$this->customer->getId() . "' AND session_id = '" . $this->db->escape($this->session->getId()) . "'")->num_rows > 0;
+	public function getProductsFromCart(){
+		$products = [];
+
+		$sql  = "
+			SELECT product_id FROM " . DB_PREFIX . "cart
+			WHERE api_id = '" . (isset($this->session->data['api_id']) ? (int)$this->session->data['api_id'] : 0) . "'
+			AND customer_id = '" . (int)$this->customer->getId() . "'
+			AND session_id = '" . $this->db->escape($this->session->getId()) . "';
+		";
+
+		foreach($this->db->query($sql)->rows as $product){
+			$products[] = $product['product_id'];
+		}
+
+		return $products;
 	}
       ]]></add>
         </operation>
@@ -84,16 +97,16 @@
             <search><![CDATA[</footer>]]></search>
             <add position="after"><![CDATA[
           <script type="text/javascript">
-            async function checkProductInCart(product_id) {
-              const response = await fetch(`index.php?route=api/find_iq/checkProductInCart&product_id=${encodeURIComponent(product_id)}`);
+          async function getProductsFromCart() {
+              const response = await fetch(`index.php?route=api/find_iq/getProductsFromCart`);
               if (!response.ok) {
                   console.error('Server error:', response.status, response.statusText);
                   return false;
               }
 
-              const json = await response.json();
-              return json && json.in_cart;
+              return await response.json();
           }
+
           </script>
           ]]></add>
         </operation>
