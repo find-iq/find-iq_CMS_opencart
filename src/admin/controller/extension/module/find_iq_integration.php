@@ -4,21 +4,21 @@ class ControllerExtensionModuleFindIqIntegration extends Controller
 {
 
     private $repo = 'https://github.com/find-iq/find-iq_CMS_opencart';
-    private  $remote_version_link = "https://raw.githubusercontent.com/find-iq/find-iq_CMS_opencart/refs/heads/3x/src/system/find_iq_version";
+
+    private $remote_version_link = "https://raw.githubusercontent.com/find-iq/find-iq_CMS_opencart/refs/heads/3x/src/system/find_iq_version";
+
+    private $remote_version_module_link = "https://github.com/find-iq/find-iq_CMS_opencart/releases/download/3x/find_iq.3.x.ocmod.zip";
+
     private $file = DIR_LOGS . "find_iq_integration_cron.log";
+
     private $error = array();
 
     private $event_code = 'find_iq_script_connect';
-
 
     private $module_path = 'extension/module/find_iq_integration';
 
     public function index()
     {
-
-
-        $version = is_file(DIR_SYSTEM . 'find_iq_version') ? file_get_contents(DIR_SYSTEM . 'find_iq_version') : '0.0.0';
-        var_dump($version);
 
         $this->load->language($this->module_path);
         $this->document->setTitle($this->language->get('heading_name'));
@@ -99,11 +99,11 @@ class ControllerExtensionModuleFindIqIntegration extends Controller
         $data['status'] = $this->config->get('module_find_iq_integration_status');
         $data['config'] = $this->config->get('module_find_iq_integration_config');
 
-        foreach (['200', '400', '600'] as $size){
+        foreach (['200', '400', '600'] as $size) {
             $data['resize_sizes'][$size] = sprintf($this->language->get('text_resize_pattern'), $size, $size);
         }
 
-        $data['text_version'] =  sprintf($this->language->get('text_version'), $this->version);
+        $data['text_version'] = sprintf($this->language->get('text_version'), $this->getCurrentVersion());
         $data['text_src'] = sprintf($this->language->get('text_src'), $this->repo);
 
         $data['header'] = $this->load->controller('common/header');
@@ -111,6 +111,55 @@ class ControllerExtensionModuleFindIqIntegration extends Controller
         $data['footer'] = $this->load->controller('common/footer');
 
         $this->response->setOutput($this->load->view($this->module_path, $data));
+    }
+
+    public function checkNewVersion()
+    {
+        $this->load->language($this->module_path);
+
+        $json = ['message' => ''];
+
+        $current_version = $this->getCurrentVersion();
+
+        $remote_version = file_get_contents($this->remote_version_link);
+
+        if (version_compare($remote_version, $current_version, '>')) {
+            $json['alert_class'] = 'alert-warning';
+            $json['message'] = sprintf(
+                $this->language->get('text_new_version_available'),
+                $remote_version,
+                $current_version,
+                $this->remote_version_module_link
+            );
+        } elseif (version_compare($remote_version, $current_version, '=')) {
+            $json['alert_class'] = 'alert-success';
+            $json['message'] = $this->language->get('text_version_is_actual');
+        } else {
+            $json['alert_class'] = 'alert-danger';
+            $json['message'] = $this->language->get('text_current_version_is_corrupt');
+        }
+
+        if ($remote_version == false || $current_version == false) {
+            $json['message'] = $this->language->get('text_error_version_check');
+            $json['alert_class'] = 'alert-danger';
+
+
+            if ($remote_version == false) {
+                $json['message'] .= $this->language->get('text_error_version_check_remote');
+            }
+            if ($current_version == false) {
+                $json['message'] .= $this->language->get('text_error_version_check_current');
+            }
+        }
+
+        $this->response->addHeader('Content-Type: application/json');
+        $this->response->setOutput(json_encode($json));
+
+    }
+
+    private function getCurrentVersion()
+    {
+        return file_get_contents(DIR_SYSTEM . 'find_iq_version');
     }
 
 

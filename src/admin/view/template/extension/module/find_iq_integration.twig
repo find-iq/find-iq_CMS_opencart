@@ -4,6 +4,7 @@
     <div class="page-header">
         <div class="container-fluid">
             <div class="pull-right">
+                <div id="check-update-btn" class="btn btn-warning"><i class="fa fa-refresh"></i></div>
                 <button type="submit" form="form-module" data-toggle="tooltip" title="{{ button_save }}"
                         class="btn btn-primary">
                     <i class="fa fa-save"></i>
@@ -168,4 +169,26 @@
         </div>
     </div>
 </div>
+<script type="text/javascript"><!--
+    document.getElementById('check-update-btn').addEventListener('click', function () {
+        fetch('index.php?route=extension/module/find_iq_integration/checkNewVersion&user_token=' + (new URLSearchParams(window.location.search)).get('user_token'), {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(response => response.json())
+            .then(json => {
+                const alert = document.createElement('div');
+                alert.className = 'alert ' + json.alert_class + ' alert-dismissible';
+                alert.innerHTML = `<i class="fa fa-exclamation-circle"></i> ${json.message}<button type="button" class="close" data-dismiss="alert">&times;</button>`;
+
+                const existingAlerts = document.querySelectorAll('.alert');
+                existingAlerts.forEach(alert => alert.remove());
+
+                document.querySelector('.page-header').append(alert);
+            })
+            .catch(error => console.error('Error:', error));
+    });
+    //--></script>
 {{ footer }}
