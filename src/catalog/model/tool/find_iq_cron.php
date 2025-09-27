@@ -223,12 +223,9 @@ class ModelToolFindIQCron extends Model
             {$where}
         ")->row;
 
-        if($totalRow['total'] == 0){
-
-            echo "USE PLAN B" . PHP_EOL;
-
+        if($totalRow['total'] == 0 && $mode === 'fast'){
             $products = $this->db->query("
-                SELECT p.product_id
+                SELECT DISTINCT p.product_id
                 FROM " . DB_PREFIX . "product p
                 JOIN {$table} fp on p.product_id = fp.product_id
                 WHERE 
