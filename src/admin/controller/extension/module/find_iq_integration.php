@@ -136,7 +136,7 @@ class ControllerExtensionModuleFindIqIntegration extends Controller
             $json['message'] = $this->language->get('text_version_is_actual');
         } else {
             $json['alert_class'] = 'alert-danger';
-            $json['message'] = $this->language->get('text_current_version_is_corrupt');
+            $json['message'] = sprintf($this->language->get('text_current_version_is_corrupt'), $this->remote_version_module_link );
         }
 
         if ($remote_version == false || $current_version == false) {
