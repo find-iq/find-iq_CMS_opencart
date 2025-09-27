@@ -223,6 +223,45 @@ class ModelToolFindIQCron extends Model
             {$where}
         ")->row;
 
+        if($totalRow['total'] == 0){
+
+            echo "USE PLAN B" . PHP_EOL;
+
+            $products = $this->db->query("
+                SELECT p.product_id
+                FROM " . DB_PREFIX . "product p
+                JOIN {$table} fp on p.product_id = fp.product_id
+                WHERE 
+                    fp.rejected = 0 AND
+                    (
+                        p.price <> IFNULL(fp.last_sended_price, 0) OR
+                        p.quantity <> IFNULL(fp.last_sended_quantity, 0) OR
+                        IFNULL((SELECT ps.price
+                                  FROM oc_product_special ps
+                                  WHERE ps.product_id = p.product_id
+                          LIMIT 1), 0) <> IFNULL(fp.last_sended_special, 0)
+                      )
+            ")->rows;
+
+            $totalRow = $this->db->query("
+                SELECT COUNT(*) AS total
+                FROM " . DB_PREFIX . "product p
+                JOIN {$table} fp on p.product_id = fp.product_id
+                WHERE 
+                    fp.rejected = 0 AND
+                    (
+                        p.price <> IFNULL(fp.last_sended_price, 0) OR
+                        p.quantity <> IFNULL(fp.last_sended_quantity, 0) OR
+                        IFNULL((SELECT ps.price
+                                  FROM oc_product_special ps
+                                  WHERE ps.product_id = p.product_id
+                          LIMIT 1), 0) <> IFNULL(fp.last_sended_special, 0)
+                      )
+                ORDER BY p.date_modified
+                LIMIT {$limit};
+            ")->row;
+        };
+
         return [
             'products' => array_map('intval', array_column($products, 'product_id')),
             'total' => isset($totalRow['total']) ? (int)$totalRow['total'] : 0,
@@ -260,9 +299,19 @@ class ModelToolFindIQCron extends Model
         $time_escaped = $this->db->escape($time);
 
         $this->db->query("
-        UPDATE " . DB_PREFIX . "find_iq_sync_products 
-        SET {$updated_field} = '{$time_escaped}'
-        WHERE product_id IN ({$product_ids_sql})
+        UPDATE " . DB_PREFIX . "find_iq_sync_products  fs
+        JOIN " . DB_PREFIX . "product p ON p.product_id = fs.product_id
+        SET 
+            fs.{$updated_field} = '{$time_escaped}',
+            fs.last_sended_price    = p.price,
+            fs.last_sended_quantity = p.quantity,
+            fs.last_sended_special  = (
+                SELECT ps.price
+                FROM " . DB_PREFIX . "product_special ps
+                WHERE ps.product_id = p.product_id AND 
+                      ps.date_start <= NOW() AND
+                      ps.date_end >= now())
+        WHERE fs.product_id IN ({$product_ids_sql})
     ");
     }
 

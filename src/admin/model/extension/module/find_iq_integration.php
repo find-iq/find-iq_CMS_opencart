@@ -11,7 +11,10 @@ class ModelExtensionModuleFindIQIntegration extends Model
                 product_id   int                    not null,
                 fast_updated int unsigned default 0 not null,
                 updated      int unsigned default 0 not null,
-                rejected     tinyint(1)   default 0 not null
+                rejected     tinyint(1)   default 0 not null,
+                last_sended_price    decimal(15, 4) null,
+                last_sended_special  decimal(15, 4) null,
+                last_sended_quantity int            null
             )');
 
 
