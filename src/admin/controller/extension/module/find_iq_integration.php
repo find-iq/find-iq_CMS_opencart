@@ -3,7 +3,6 @@
 class ControllerExtensionModuleFindIqIntegration extends Controller
 {
 
-    private $version = '0.1alpha';
     private $repo = 'https://github.com/find-iq/find-iq_CMS_opencart';
     private $file = DIR_LOGS . "find_iq_integration_cron.log";
     private $error = array();
@@ -15,6 +14,10 @@ class ControllerExtensionModuleFindIqIntegration extends Controller
 
     public function index()
     {
+
+
+        $version = is_file(DIR_SYSTEM . 'find_iq_version') ? file_get_contents(DIR_SYSTEM . 'find_iq_version') : '0.0.0';
+        var_dump($version);
 
         $this->load->language($this->module_path);
         $this->document->setTitle($this->language->get('heading_name'));
