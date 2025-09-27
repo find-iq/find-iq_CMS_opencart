@@ -4,6 +4,7 @@ class ControllerExtensionModuleFindIqIntegration extends Controller
 {
 
     private $repo = 'https://github.com/find-iq/find-iq_CMS_opencart';
+    private  $remote_version_link = "https://raw.githubusercontent.com/find-iq/find-iq_CMS_opencart/refs/heads/3x/src/system/find_iq_version";
     private $file = DIR_LOGS . "find_iq_integration_cron.log";
     private $error = array();
 
