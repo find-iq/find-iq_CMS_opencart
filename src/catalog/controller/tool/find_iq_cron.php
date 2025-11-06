@@ -113,7 +113,7 @@ class ControllerToolFindIQCron extends Controller
                             foreach (array_keys($product) as $field) {
                                 if(!in_array($field, ['quantity', ])){
 
-                                    if ($product[$field] == '' || $product[$field] == 0) {
+                                    if ($product[$field] == '' || $product[$field] === 0) {
                                         unset($products[$product_key][$field]);
                                     }
                                 }
