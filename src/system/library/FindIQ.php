@@ -19,7 +19,7 @@ class FindIQ
     private $curl;
 
     /** @var string */
-    private $base_url = 'https://panel.find-iq.com';
+    private $base_url = 'https://api.find-iq.com/v.2/api';
 
     /** @var string */
     private $search_base_url = 'https://api.find-iq.com/smart/';
