@@ -352,7 +352,7 @@ class ControllerToolFindIQCron extends Controller
             if (isset($row['descriptions']) && is_array($row['descriptions'])) {
                 foreach ($row['descriptions'] as &$description) {
                     if (array_key_exists('language_id', $description)) {
-                        $description['language_id'] = $mapLang($description['language_id']);
+                        $description['language_id'] = (int)$mapLang($description['language_id']);
                         unset($description['language_code']);
                     }
                 }
@@ -364,7 +364,7 @@ class ControllerToolFindIQCron extends Controller
                 if (isset($row['attributes']) && is_array($row['attributes'])) {
                     foreach ($row['attributes'] as &$attribute) {
                         if (array_key_exists('language_id', $attribute)) {
-                            $attribute['language_id'] = $mapLang($attribute['language_id']);
+                            $attribute['language_id'] = (int)$mapLang($attribute['language_id']);
                         }
                     }
                     unset($attribute);
