@@ -93,6 +93,12 @@ class ModelToolFindIQCron extends Model
 
         $products = $this->db->query($sql)->rows;
 
+        foreach ($products as &$product) {
+            if(isset($product['status'])){
+                $product['status'] = (int)$product['status'];
+            }
+        }
+
         if ($mode === 'full') {
             $languages = implode(',', array_map('intval', array_column($this->getAllLanguages(), 'language_id')));
 
