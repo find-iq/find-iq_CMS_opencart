@@ -54,17 +54,19 @@ class ControllerToolFindIQCron extends Controller
             $batch_size = $this->request->get['batch_size'] ?? 10;
 
             if (in_array('categories', $this->actions) || in_array('products', $this->actions)) {
-                $this->categories = $this->model_tool_find_iq_cron->getAllCategories();
+                $this->categories = array_chunk($this->model_tool_find_iq_cron->getAllCategories(), 100, true);
             }
 
 
 
             if (in_array('categories', $this->actions)) {
-                $this->FindIQ->postCategoriesBatch(
-                    $this->prepareCategoriesForSync(
-                        $this->categories
-                    )
-                );
+                foreach($this->categories as $categories_pack){
+                    $this->FindIQ->postCategoriesBatch(
+                        $this->prepareCategoriesForSync(
+                            $categories_pack
+                        )
+                    );
+                }
             }
 
 
