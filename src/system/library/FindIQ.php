@@ -443,6 +443,10 @@ class FindIQ
                 }
             }
             $this->log('FindIQ: API error: ' . $msg);
+            $this->log($this->last_response['status']);
+            $this->log($this->last_response['headers']);
+            $this->log($this->last_response['body_raw']);
+            $this->log($this->last_response['error']);
             throw new RuntimeException('FindIQ API error: ' . $msg, $status);
         }
 
