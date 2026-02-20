@@ -46,7 +46,7 @@
             <search><![CDATA[$query = $this->db->query("SELECT * FROM " . DB_PREFIX . "product_related]]></search>
             <add position="after"><![CDATA[
 
-		if($query->countAffected == 0){
+		if($this->db->countAffected() == 0){
 
 			$query->rows = [];
 
