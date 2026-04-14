@@ -12,6 +12,7 @@
  *   actions    — через кому: products, categories, frontend (default: products)
  *   batch_size — кількість товарів за один запит (default: 10)
  *   time       — ліміт виконання в секундах (0 = без ліміту)
+ *   reset      — 1 = скинути стан синхронізації (first_synced=NULL, updated=0) перед запуском
  */
 class ControllerFindIqWebhook extends Controller
 {
@@ -47,9 +48,16 @@ class ControllerFindIqWebhook extends Controller
         $actions = $this->request->get['actions'] ?? 'products';
         $batch   = (int)($this->request->get['batch_size'] ?? 10);
         $time    = (int)($this->request->get['time'] ?? 0);
+        $reset   = isset($this->request->get['reset']) && $this->request->get['reset'] === '1';
 
         if (!in_array($mode, ['fast', 'full'])) {
             $mode = 'fast';
+        }
+
+        // 3a. Скидання стану синхронізації якщо reset=1
+        if ($reset) {
+            $this->load->model('tool/find_iq_cron');
+            $this->model_tool_find_iq_cron->resetSyncState();
         }
 
         // 4. Передаємо параметри у GET щоб cron-контролер їх побачив
@@ -65,6 +73,7 @@ class ControllerFindIqWebhook extends Controller
 
         $this->response->setOutput(json_encode([
             'status'  => 'ok',
+            'reset'   => $reset,
             'mode'    => $mode,
             'actions' => $actions,
             'log'     => $output,

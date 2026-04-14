@@ -492,6 +492,21 @@ class ModelToolFindIQCron extends Model
         return trim($text);
     }
 
+    /**
+     * Скидає стан синхронізації — модуль вважатиме що жоден товар ще не передавався.
+     * Використовується при повному очищенні індексу на стороні FindIQ.
+     */
+    public function resetSyncState(): void
+    {
+        $this->db->query('
+            UPDATE ' . DB_PREFIX . 'find_iq_sync_products
+            SET first_synced = NULL,
+                updated      = 0,
+                fast_updated = 0
+            WHERE rejected = 0
+        ');
+    }
+
     public function getProductQtyData($product_id){
         return $this->db->query("
             SELECT f.product_id AS \"product-id\", p.quantity
