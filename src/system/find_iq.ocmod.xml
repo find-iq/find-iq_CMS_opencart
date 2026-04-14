@@ -46,7 +46,7 @@
             <search><![CDATA[$query = $this->db->query("SELECT * FROM " . DB_PREFIX . "product_related]]></search>
             <add position="after"><![CDATA[
 
-		if($this->db->countAffected() == 0){
+		if($this->db->countAffected() == 0 && $this->config->get('module_find_iq_integration_similar') == '1'){
 
 			$query->rows = [];
 
