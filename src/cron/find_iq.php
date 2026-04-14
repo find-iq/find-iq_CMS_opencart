@@ -128,8 +128,29 @@ $controller->execute($registry);
 // Вивід
 $response->output();
 
-// Remove webhook lock file when sync is done
+// Self-respawn: if products remain — spawn new process and update lock;
+// otherwise remove lock to signal completion.
 $lockFile = DIR_STORAGE . 'find_iq_sync.lock';
-if (is_file($lockFile)) {
-    @unlink($lockFile);
+
+$remaining = $db->query(
+    "SELECT COUNT(*) AS cnt FROM `" . DB_PREFIX . "find_iq_sync_products`"
+    . " WHERE first_synced IS NULL AND rejected = 0"
+);
+
+if ((int)$remaining->row['cnt'] > 0) {
+    $phpBin   = PHP_BINARY ?: 'php';
+    $selfFile = __FILE__;
+    $passArgs = implode(' ', array_slice($argv, 1));
+    $cmd      = sprintf(
+        'nohup %s %s %s > /dev/null 2>&1 & echo $!',
+        escapeshellarg($phpBin),
+        escapeshellarg($selfFile),
+        $passArgs
+    );
+    $newPid = (int)trim(shell_exec($cmd));
+    file_put_contents($lockFile, $newPid);
+} else {
+    if (is_file($lockFile)) {
+        @unlink($lockFile);
+    }
 }
