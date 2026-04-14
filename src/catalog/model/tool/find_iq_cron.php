@@ -94,8 +94,17 @@ class ModelToolFindIQCron extends Model
         $products = $this->db->query($sql)->rows;
 
         foreach ($products as &$product) {
-            if(isset($product['status'])){
+            if (isset($product['status'])) {
                 $product['status'] = (int)$product['status'];
+            }
+            if (isset($product['price'])) {
+                $product['price'] = (float)$product['price'];
+            }
+            if (array_key_exists('sale_price', $product)) {
+                $product['sale_price'] = $product['sale_price'] !== null ? (float)$product['sale_price'] : null;
+            }
+            if (isset($product['quantity'])) {
+                $product['quantity'] = (int)$product['quantity'];
             }
         }
 
@@ -194,80 +203,85 @@ class ModelToolFindIQCron extends Model
 
 
     /**
-     * @param int $time_limit
-     * @param int $limit
-     * @param string $mode
+     * Повертає список товарів для синхронізації згідно з пріоритетом.
      *
-     * @return array
+     * @param int    $time_limit  Unix timestamp межі для переіндексу
+     * @param int    $limit       Розмір батчу
+     * @param string $mode        'fast' | 'full'
+     * @param string $priority    'new' | 'changed' | 'reindex'
+     *
+     * @return array{products: int[], total: int}
      */
-    public function getProductsListToSync(int $time_limit, int $limit, string $mode): array
+    public function getProductsListToSync(int $time_limit, int $limit, string $mode, string $priority = 'reindex'): array
     {
-        $time_field = ($mode === 'fast') ? 'fast_updated' : 'updated';
-        $time_limit = (int)$time_limit;
         $limit = (int)$limit;
-
         $table = DB_PREFIX . "find_iq_sync_products";
-        $where = "WHERE {$time_field} < {$time_limit} AND rejected = 0";
 
-        if($mode === 'fast'){
-            $where .= " AND updated > 0";
-        }
+        if ($priority === 'new') {
+            // Товари які ніколи не передавались у FindIQ
+            $where = "WHERE first_synced IS NULL AND rejected = 0";
+            $order = "ORDER BY product_id";
 
-        $order = "ORDER BY {$time_field}, product_id";
-
-        $products = $this->db->query("
-            SELECT product_id
-            FROM {$table}
-            {$where}
-            {$order}
-            LIMIT {$limit}
-        ")->rows;
-
-        $totalRow = $this->db->query("
-            SELECT COUNT(*) AS total
-            FROM {$table}
-            {$where}
-        ")->row;
-
-        if($totalRow['total'] == 0 && $mode === 'fast'){
             $products = $this->db->query("
-                SELECT DISTINCT p.product_id
-                FROM " . DB_PREFIX . "product p
-                JOIN {$table} fp on p.product_id = fp.product_id
-                WHERE 
-                    fp.rejected = 0 AND
-                    (
-                        p.price <> IFNULL(fp.last_sended_price, 0) OR
-                        p.quantity <> IFNULL(fp.last_sended_quantity, 0) OR
-                        IFNULL((SELECT ps.price
-                                  FROM oc_product_special ps
-                                  WHERE ps.product_id = p.product_id
-                          LIMIT 1), 0) <> IFNULL(fp.last_sended_special, 0)
-                      )
+                SELECT product_id FROM {$table} {$where} {$order} LIMIT {$limit}
             ")->rows;
 
             $totalRow = $this->db->query("
-                SELECT COUNT(*) AS total
-                FROM " . DB_PREFIX . "product p
-                JOIN {$table} fp on p.product_id = fp.product_id
-                WHERE 
-                    fp.rejected = 0 AND
-                    (
-                        p.price <> IFNULL(fp.last_sended_price, 0) OR
-                        p.quantity <> IFNULL(fp.last_sended_quantity, 0) OR
-                        IFNULL((SELECT ps.price
-                                  FROM oc_product_special ps
-                                  WHERE ps.product_id = p.product_id
-                          LIMIT 1), 0) <> IFNULL(fp.last_sended_special, 0)
-                      )
-                ORDER BY p.date_modified
-                LIMIT {$limit};
+                SELECT COUNT(*) AS total FROM {$table} {$where}
             ")->row;
-        };
+
+        } elseif ($priority === 'changed') {
+            // Товари у яких змінилась ціна, кількість або акційна ціна
+            $changed_where = "
+                fp.rejected = 0
+                AND fp.first_synced IS NOT NULL
+                AND (
+                    p.price <> IFNULL(fp.last_sended_price, 0) OR
+                    p.quantity <> IFNULL(fp.last_sended_quantity, 0) OR
+                    IFNULL((SELECT ps.price FROM " . DB_PREFIX . "product_special ps
+                             WHERE ps.product_id = p.product_id
+                               AND (ps.date_start = '0000-00-00 00:00:00' OR ps.date_start < NOW())
+                               AND (ps.date_end   = '0000-00-00 00:00:00' OR ps.date_end   > NOW())
+                             ORDER BY ps.priority ASC, ps.price ASC
+                             LIMIT 1), 0)
+                        <> IFNULL(fp.last_sended_special, 0)
+                )
+            ";
+
+            $products = $this->db->query("
+                SELECT DISTINCT p.product_id
+                FROM " . DB_PREFIX . "product p
+                JOIN {$table} fp ON p.product_id = fp.product_id
+                WHERE {$changed_where}
+                ORDER BY p.date_modified
+                LIMIT {$limit}
+            ")->rows;
+
+            $totalRow = $this->db->query("
+                SELECT COUNT(DISTINCT p.product_id) AS total
+                FROM " . DB_PREFIX . "product p
+                JOIN {$table} fp ON p.product_id = fp.product_id
+                WHERE {$changed_where}
+            ")->row;
+
+        } else {
+            // Переіндекс: вже синхронізовані товари старіші за time_limit
+            $time_limit = (int)$time_limit;
+            $where = "WHERE updated < {$time_limit} AND rejected = 0 AND first_synced IS NOT NULL";
+            $order = "ORDER BY updated, product_id";
+
+            $products = $this->db->query("
+                SELECT product_id FROM {$table} {$where} {$order} LIMIT {$limit}
+            ")->rows;
+
+            $totalRow = $this->db->query("
+                SELECT COUNT(*) AS total FROM {$table} {$where}
+            ")->row;
+        }
 
         return [
             'products' => array_map('intval', array_column($products, 'product_id')),
-            'total' => isset($totalRow['total']) ? (int)$totalRow['total'] : 0,
+            'total'    => isset($totalRow['total']) ? (int)$totalRow['total'] : 0,
         ];
     }
 
@@ -304,16 +318,19 @@ class ModelToolFindIQCron extends Model
         $this->db->query("
         UPDATE " . DB_PREFIX . "find_iq_sync_products  fs
         JOIN " . DB_PREFIX . "product p ON p.product_id = fs.product_id
-        SET 
+        SET
             fs.{$updated_field} = '{$time_escaped}',
+            fs.first_synced     = COALESCE(fs.first_synced, '{$time_escaped}'),
             fs.last_sended_price    = p.price,
             fs.last_sended_quantity = p.quantity,
             fs.last_sended_special  = (
                 SELECT ps.price
                 FROM " . DB_PREFIX . "product_special ps
-                WHERE ps.product_id = p.product_id AND 
-                      ps.date_start <= NOW() AND
-                      ps.date_end >= now())
+                WHERE ps.product_id = p.product_id
+                  AND (ps.date_start = '0000-00-00 00:00:00' OR ps.date_start < NOW())
+                  AND (ps.date_end   = '0000-00-00 00:00:00' OR ps.date_end   > NOW())
+                ORDER BY ps.priority ASC, ps.price ASC
+                LIMIT 1)
         WHERE fs.product_id IN ({$product_ids_sql})
     ");
     }
@@ -482,6 +499,21 @@ class ModelToolFindIQCron extends Model
         $text = preg_replace('/[\x{1F000}-\x{1FAFF}\x{1FC00}-\x{1FFFF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}]/u', '', $text);
 
         return trim($text);
+    }
+
+    /**
+     * Скидає стан синхронізації — модуль вважатиме що жоден товар ще не передавався.
+     * Використовується при повному очищенні індексу на стороні FindIQ.
+     */
+    public function resetSyncState(): void
+    {
+        $this->db->query('
+            UPDATE ' . DB_PREFIX . 'find_iq_sync_products
+            SET first_synced = NULL,
+                updated      = 0,
+                fast_updated = 0
+            WHERE rejected = 0
+        ');
     }
 
     public function getProductQtyData($product_id){

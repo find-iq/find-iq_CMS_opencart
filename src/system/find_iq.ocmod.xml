@@ -46,13 +46,13 @@
             <search><![CDATA[$query = $this->db->query("SELECT * FROM " . DB_PREFIX . "product_related]]></search>
             <add position="after"><![CDATA[
 
-		if($this->db->countAffected() == 0){
+		if($this->db->countAffected() == 0 && $this->config->get('module_find_iq_integration_similar') == '1'){
 
 			$query->rows = [];
 
 			$this->load->library('FindIQ');
 
-			$response = $this->FindIQ->getSearchSimilar($product_id, ['limit' => 10, 'price_spread' => 40, 'same_category' => true, 'only_avaiable' => true] );
+			$response = $this->FindIQ->getSearchSimilar($product_id, ['limit' => 10, 'price_spread' => 40, 'same_category' => true, 'only_available' => true] );
 
 			if(!empty($response) && $response['data']['code'] == 200 && count($response['data']['data']['hits'] > 0)){
 

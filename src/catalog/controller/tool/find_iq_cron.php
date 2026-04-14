@@ -79,128 +79,45 @@ class ControllerToolFindIQCron extends Controller
 
             if (in_array('products', $this->actions)) {
 
-                $total = $this->getProductsListToSync($mode, 1, $offset_hours)['total'] ?? 0;
+                $time_limit_reached = false;
 
-                echo 'Total products to sync: ' . $total . PHP_EOL;
+                // === PHASE 1: NEW PRODUCTS (never synced to FindIQ) ===
+                $new_total = $this->getProductsListToSync('full', 1, $offset_hours, 'new')['total'] ?? 0;
+                echo 'New products (never synced): ' . $new_total . PHP_EOL;
 
-                $have_products_to_update = $total > 0;
-
-                $processed = 0;
-
-                while ($have_products_to_update === true) {
-
-                    $to_update = $this->getProductsListToSync($mode, $batch_size, $offset_hours);
-                    $have_products_to_update = isset($to_update['products']) && count($to_update['products']) > 0;
-
-                    if (!$have_products_to_update) {
-                        break;
+                if ($new_total > 0) {
+                    // Auto-sync categories before sending new products
+                    foreach ($this->categories as $categories_pack) {
+                        $this->FindIQ->postCategoriesBatch(
+                            $this->prepareCategoriesForSync($categories_pack)
+                        );
                     }
-
-                    echo 'start [ ' . $processed . '-' . ($processed + count($to_update['products'])) . '/' . $total . ' ] products ';
-
-
-                    $products = $this->model_tool_find_iq_cron->getProductsBatchOptimized(
-                        $to_update['products'],
-                        $mode
+                    $time_limit_reached = $this->runSyncPhase(
+                        'new', 'full', $batch_size, $new_total, $config, $timeLimitSeconds, $timeStart, $offset_hours
                     );
+                }
 
-                    $rejected_products = [];
+                // === PHASE 2: CHANGED PRODUCTS (price / qty / special changed) ===
+                if (!$time_limit_reached) {
+                    $changed_total = $this->getProductsListToSync('fast', 1, $offset_hours, 'changed')['total'] ?? 0;
+                    echo 'Changed products (price/qty): ' . $changed_total . PHP_EOL;
 
-                    foreach (array_column($products, 'product_id_ext') as $product_id){
-                        $rejected_products[$product_id] = 0;
+                    if ($changed_total > 0) {
+                        $time_limit_reached = $this->runSyncPhase(
+                            'changed', 'fast', $batch_size, $changed_total, $config, $timeLimitSeconds, $timeStart, $offset_hours
+                        );
                     }
+                }
 
-                    echo '=';
-                    if ($mode == 'full') {
+                // === PHASE 3: REINDEX (full mode only) ===
+                if (!$time_limit_reached && $mode === 'full') {
+                    $reindex_total = $this->getProductsListToSync('full', 1, $offset_hours, 'reindex')['total'] ?? 0;
+                    echo 'Products to reindex: ' . $reindex_total . PHP_EOL;
 
-
-                        echo '=';
-
-                        foreach ($products as $product_key => $product) {
-
-                            foreach (array_keys($product) as $field) {
-                                if(!in_array($field, ['quantity', ])){
-
-                                    if ($product[$field] == '' || $product[$field] === 0) {
-                                        unset($products[$product_key][$field]);
-                                    }
-                                }
-                            }
-
-                            if(empty($product['manufacturer']['descriptions'])){
-                                unset($products[$product_key]['manufacturer']['descriptions']);
-                            }
-
-                            if (is_file(DIR_IMAGE . $product['image'])) {
-                                $products[$product_key]['image'] = $this->model_tool_image->resize($product['image'], $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
-                            } else {
-                                $products[$product_key]['image'] = $this->model_tool_image->resize('no_image.png', $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
-                            }
-
-                            foreach ($product['descriptions'] as $product_description_key => $description) {
-                                $this->config->set('config_language_id', $description['language_id']);
-                                $products[$product_key]['descriptions'][$product_description_key]['url'] = html_entity_decode($this->url->link('product/product', 'product_id=' . $product['product_id_ext'], true));
-                            }
-
-                            $products[$product_key]['categories'][] = $product['category_id'];
-
-                            unset($products[$product_key]['category_id']);
-
-                            if($product['category_id'] == '0'){
-                                unset($products[$product_key]);
-                                $rejected_products[$product['product_id_ext']] = 1;
-                            }
-
-
-                        }
-
-                        echo '=';
-                        $this->swapLanguageId($products, 'product');
-                    }
-
-                    echo '=';
-                    $products = $this->removeNullValues($products);
-
-                    if($mode == 'full'){
-                        $this->FindIQ->postProductsBatch($products);
-                    } else {
-                        $this->FindIQ->putProductsBatch($products);
-                    }
-
-
-
-
-                    $rejected_products = array_filter($rejected_products);
-                    if(!empty($rejected_products)){
-                        echo '=[rejected-';
-                        echo $this->model_tool_find_iq_cron->markProductsAsRejected(array_keys($rejected_products));
-                        echo ']';
-                    }
-
-                    // echo '=';
-                    //
-                    // $this->model_tool_find_iq_cron->updateProductsFindIqIds(
-                    //     $this->FindIQ->getProductFindIqIds(
-                    //         array_values(
-                    //             array_column($products, 'product_id_ext')
-                    //         )
-                    //     )
-                    // );
-
-                    echo '=';
-                    $this->model_tool_find_iq_cron->markProductsAsSynced(array_column($products, 'product_id_ext'), $mode, $this->now);
-                    $this->model_tool_find_iq_cron->clearRelated(array_column($products, 'product_id_ext'));
-                    echo '=';
-
-                    $processed += count($products);
-
-                    // Optionally output progress per batch to logs
-                    echo ' processed ' . count($products) . PHP_EOL;
-
-                    // Check time limit after finishing the current batch (do not interrupt mid-operation)
-                    if (!empty($timeLimitSeconds) && (time() - $timeStart) >= $timeLimitSeconds) {
-                        echo 'Time limit (' . $timeLimitSeconds . "s) reached. Stopping after current batch." . PHP_EOL;
-                        break;
+                    if ($reindex_total > 0) {
+                        $this->runSyncPhase(
+                            'reindex', 'full', $batch_size, $reindex_total, $config, $timeLimitSeconds, $timeStart, $offset_hours
+                        );
                     }
                 }
             }
@@ -381,37 +298,136 @@ class ControllerToolFindIQCron extends Controller
     }
 
 
-    private function getProductsListToSync($mode = 'fast', $limit = 100, int $offset_hours = 2)
-    {
-        if ($offset_hours < 1) {
-            trigger_error('offset_hours must be greater than 0', E_USER_ERROR);
-            if ($mode == 'fast') {
-                $offset_hours = 2;
+    /**
+     * Виконує один цикл синхронізації для заданого пріоритету.
+     * Повертає true якщо досягнуто ліміт часу, false якщо завершено нормально.
+     */
+    private function runSyncPhase(
+        string $priority,
+        string $api_mode,
+        int    $batch_size,
+        int    $total,
+        array  $config,
+        int    $timeLimitSeconds,
+        int    $timeStart,
+        int    $offset_hours
+    ): bool {
+        $processed = 0;
+
+        while (true) {
+            $to_update = $this->getProductsListToSync($api_mode, $batch_size, $offset_hours, $priority);
+
+            if (empty($to_update['products'])) {
+                break;
+            }
+
+            echo 'start [' . $priority . ' ' . $processed . '-' . ($processed + count($to_update['products'])) . '/' . $total . '] products ';
+
+            $products = $this->model_tool_find_iq_cron->getProductsBatchOptimized(
+                $to_update['products'],
+                $api_mode
+            );
+
+            $rejected_products = [];
+            foreach (array_column($products, 'product_id_ext') as $product_id) {
+                $rejected_products[$product_id] = 0;
+            }
+
+            echo '=';
+
+            if ($api_mode === 'full') {
+                echo '=';
+
+                foreach ($products as $product_key => $product) {
+                    foreach (array_keys($product) as $field) {
+                        if (!in_array($field, ['quantity'])) {
+                            if ($product[$field] == '' || $product[$field] === 0) {
+                                unset($products[$product_key][$field]);
+                            }
+                        }
+                    }
+
+                    if (empty($product['manufacturer']['descriptions'])) {
+                        unset($products[$product_key]['manufacturer']['descriptions']);
+                    }
+
+                    if (is_file(DIR_IMAGE . $product['image'])) {
+                        $products[$product_key]['image'] = $this->model_tool_image->resize($product['image'], $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
+                    } else {
+                        $products[$product_key]['image'] = $this->model_tool_image->resize('no_image.png', $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
+                    }
+
+                    foreach ($product['descriptions'] as $product_description_key => $description) {
+                        $this->config->set('config_language_id', $description['language_id']);
+                        $products[$product_key]['descriptions'][$product_description_key]['url'] = html_entity_decode($this->url->link('product/product', 'product_id=' . $product['product_id_ext'], true));
+                    }
+
+                    $products[$product_key]['categories'][] = $product['category_id'];
+                    unset($products[$product_key]['category_id']);
+
+                    if ($product['category_id'] == '0') {
+                        unset($products[$product_key]);
+                        $rejected_products[$product['product_id_ext']] = 1;
+                    }
+                }
+
+                echo '=';
+                $this->swapLanguageId($products, 'product');
+            }
+
+            echo '=';
+            $products = $this->removeNullValues($products);
+
+            if ($api_mode === 'full') {
+                $this->FindIQ->postProductsBatch($products);
             } else {
-                $offset_hours = 24;
+                $this->FindIQ->putProductsBatch($products);
+            }
+
+            $rejected_products = array_filter($rejected_products);
+            if (!empty($rejected_products)) {
+                echo '=[rejected-';
+                echo $this->model_tool_find_iq_cron->markProductsAsRejected(array_keys($rejected_products));
+                echo ']';
+            }
+
+            echo '=';
+            $this->model_tool_find_iq_cron->markProductsAsSynced(array_column($products, 'product_id_ext'), $api_mode, $this->now);
+            $this->model_tool_find_iq_cron->clearRelated(array_column($products, 'product_id_ext'));
+            echo '=';
+
+            $processed += count($products);
+            echo ' processed ' . count($products) . PHP_EOL;
+
+            if (!empty($timeLimitSeconds) && (time() - $timeStart) >= $timeLimitSeconds) {
+                echo 'Time limit (' . $timeLimitSeconds . "s) reached. Stopping after current batch." . PHP_EOL;
+                return true;
             }
         }
 
+        return false;
+    }
+
+
+    private function getProductsListToSync(string $mode = 'fast', int $limit = 100, int $offset_hours = 2, string $priority = 'reindex'): array
+    {
+        if ($offset_hours < 1) {
+            $offset_hours = ($mode === 'fast') ? 2 : 24;
+        }
+
         if ($limit < 1) {
-            trigger_error('limit must be greater than 0', E_USER_ERROR);
             $limit = 100;
         }
 
         if (!in_array($mode, ['fast', 'full'])) {
-            trigger_error('mode must be either "fast" or "full"', E_USER_ERROR);
             $mode = 'fast';
         }
 
         $this->now = (new DateTime())->getTimestamp();
-
-        // тут ми маємо межу за якою можемо визначити які товари брати, а які ні. Згідно часу їх останнього оновлення
         $time_limit = $this->now - ($offset_hours * 60 * 60);
 
         $this->load->model('tool/find_iq_cron');
 
-
-        return $this->model_tool_find_iq_cron->getProductsListToSync($time_limit, $limit, $mode);
-
-
+        return $this->model_tool_find_iq_cron->getProductsListToSync($time_limit, $limit, $mode, $priority);
     }
 }
