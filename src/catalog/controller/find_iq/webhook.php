@@ -4,23 +4,29 @@
  * FindIQ Webhook endpoint (OC 3)
  * URL: index.php?route=find_iq/webhook
  *
- * Дозволяє FindIQ-серверу централізовано запускати синхронізацію товарів.
+ * Fire-and-forget: responds immediately, runs sync as background PHP CLI process.
+ * Sync progress is tracked via DB and a lock file.
  *
- * Параметри GET:
- *   secret     — токен магазину (має збігатись з module_find_iq_integration_config['token'])
- *   mode       — fast (ціни/наявність) | full (повна заливка)
- *   actions    — через кому: products, categories, frontend (default: products)
- *   batch_size — кількість товарів за один запит (default: 10)
- *   time       — ліміт виконання в секундах (0 = без ліміту)
- *   reset      — 1 = скинути стан синхронізації (first_synced=NULL, updated=0) перед запуском
+ * GET params:
+ *   secret     — shop token (must match module_find_iq_integration_config['token'])
+ *   action     — start (default) | status
+ *   mode       — fast (price/qty) | full (default: fast)
+ *   actions    — comma-separated: products, categories, frontend (default: products)
+ *   batch_size — products per API batch (default: 10)
+ *   reset      — 1 = reset sync state (first_synced=NULL, updated=0) before launch
  */
 class ControllerFindIqWebhook extends Controller
 {
+    private function getLockFile(): string
+    {
+        return DIR_STORAGE . 'find_iq_sync.lock';
+    }
+
     public function index()
     {
         $this->response->addHeader('Content-Type: application/json');
 
-        // 1. Перевірка що модуль увімкнено
+        // 1. Module enabled check
         if ($this->config->get('module_find_iq_integration_status') != '1') {
             $this->response->setOutput(json_encode([
                 'status'  => 'error',
@@ -29,7 +35,7 @@ class ControllerFindIqWebhook extends Controller
             return;
         }
 
-        // 2. Перевірка секретного токену
+        // 2. Token check
         $config = $this->config->get('module_find_iq_integration_config');
         $token  = isset($config['token']) ? (string)$config['token'] : '';
         $secret = isset($this->request->get['secret']) ? (string)$this->request->get['secret'] : '';
@@ -43,40 +49,104 @@ class ControllerFindIqWebhook extends Controller
             return;
         }
 
-        // 3. Параметри запуску
+        $action = $this->request->get['action'] ?? 'start';
+
+        if ($action === 'status') {
+            $this->handleStatus();
+            return;
+        }
+
+        // 3. Parse start params
         $mode    = $this->request->get['mode'] ?? 'fast';
         $actions = $this->request->get['actions'] ?? 'products';
         $batch   = (int)($this->request->get['batch_size'] ?? 10);
-        $time    = (int)($this->request->get['time'] ?? 0);
         $reset   = isset($this->request->get['reset']) && $this->request->get['reset'] === '1';
 
         if (!in_array($mode, ['fast', 'full'])) {
             $mode = 'fast';
         }
 
-        // 3a. Скидання стану синхронізації якщо reset=1
+        // 4. Lock check — prevent duplicate runs
+        $lockFile = $this->getLockFile();
+        if (is_file($lockFile)) {
+            $pid = (int)trim(file_get_contents($lockFile));
+            if ($pid > 0 && file_exists('/proc/' . $pid)) {
+                $this->response->setOutput(json_encode([
+                    'status'  => 'already_running',
+                    'pid'     => $pid,
+                    'message' => 'Sync job is already running',
+                ]));
+                return;
+            }
+            // Stale lock — remove
+            @unlink($lockFile);
+        }
+
+        // 5. Reset sync state if requested
         if ($reset) {
             $this->load->model('tool/find_iq_cron');
             $this->model_tool_find_iq_cron->resetSyncState();
         }
 
-        // 4. Передаємо параметри у GET щоб cron-контролер їх побачив
-        $this->request->get['mode']       = $mode;
-        $this->request->get['actions']    = $actions;
-        $this->request->get['batch_size'] = $batch;
-        $this->request->get['time']       = $time;
+        // 6. Build CLI command and launch background process
+        $phpBin  = PHP_BINARY ?: 'php';
+        $cronFile = DIR_BASE . 'cron/find_iq.php';
 
-        // 5. Запускаємо cron-контролер і захоплюємо вивід
-        ob_start();
-        $this->load->controller('tool/find_iq_cron');
-        $output = ob_get_clean();
+        $args = 'mode=' . escapeshellarg($mode)
+            . ' actions=' . escapeshellarg($actions)
+            . ' batch_size=' . (int)$batch;
+
+        $cmd = sprintf(
+            'nohup %s %s %s > /dev/null 2>&1 & echo $!',
+            escapeshellarg($phpBin),
+            escapeshellarg($cronFile),
+            $args
+        );
+
+        $pid = (int)trim(shell_exec($cmd));
+
+        // Write lock file with PID
+        file_put_contents($lockFile, $pid);
 
         $this->response->setOutput(json_encode([
-            'status'  => 'ok',
+            'status'  => 'started',
+            'pid'     => $pid,
             'reset'   => $reset,
             'mode'    => $mode,
             'actions' => $actions,
-            'log'     => $output,
+            'message' => 'Sync job launched in background',
+        ]));
+    }
+
+    private function handleStatus(): void
+    {
+        $lockFile = $this->getLockFile();
+        $running  = false;
+        $pid      = null;
+
+        if (is_file($lockFile)) {
+            $pid     = (int)trim(file_get_contents($lockFile));
+            $running = $pid > 0 && file_exists('/proc/' . $pid);
+        }
+
+        $query = $this->db->query("
+            SELECT
+                COUNT(*)                       AS total,
+                SUM(first_synced IS NOT NULL)  AS synced,
+                SUM(rejected = 1)              AS rejected
+            FROM `" . DB_PREFIX . "find_iq_sync_products`
+        ");
+
+        $row = $query->row;
+
+        $this->response->setOutput(json_encode([
+            'status'   => $running ? 'running' : 'idle',
+            'pid'      => $pid,
+            'progress' => [
+                'total'    => (int)($row['total']    ?? 0),
+                'synced'   => (int)($row['synced']   ?? 0),
+                'rejected' => (int)($row['rejected'] ?? 0),
+            ],
         ]));
     }
 }

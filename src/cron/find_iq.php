@@ -127,3 +127,9 @@ $controller->execute($registry);
 
 // Вивід
 $response->output();
+
+// Remove webhook lock file when sync is done
+$lockFile = DIR_STORAGE . 'find_iq_sync.lock';
+if (is_file($lockFile)) {
+    @unlink($lockFile);
+}
