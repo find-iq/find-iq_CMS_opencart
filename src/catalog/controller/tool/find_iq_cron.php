@@ -52,7 +52,7 @@ class ControllerToolFindIQCron extends Controller
 
 
             // items per batch (API batch size)
-            $batch_size = $this->request->get['batch_size'] ?? 10;
+            $batch_size = $this->request->get['batch_size'] ?? 50;
 
             if (in_array('categories', $this->actions) || in_array('products', $this->actions)) {
                 $this->categories = array_chunk($this->model_tool_find_iq_cron->getAllCategories(), 100, true);

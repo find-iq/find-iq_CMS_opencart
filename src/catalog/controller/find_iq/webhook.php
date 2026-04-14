@@ -59,7 +59,7 @@ class ControllerFindIqWebhook extends Controller
         // 3. Parse start params
         $mode    = $this->request->get['mode'] ?? 'fast';
         $actions = $this->request->get['actions'] ?? 'products';
-        $batch   = (int)($this->request->get['batch_size'] ?? 10);
+        $batch   = (int)($this->request->get['batch_size'] ?? 50);
         $reset   = isset($this->request->get['reset']) && $this->request->get['reset'] === '1';
 
         if (!in_array($mode, ['fast', 'full'])) {
