@@ -94,8 +94,7 @@ class FindIQ
     {
         $params = [
             'query' => $query,
-            'lang'  => $lang,
-            'page'  => (int)$page,
+            'page' => (int)$page,
         ];
 
         if($category){
