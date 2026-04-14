@@ -58,7 +58,11 @@ class ControllerToolFindIQCron extends Controller
                 $this->categories = array_chunk($this->model_tool_find_iq_cron->getAllCategories(), 100, true);
             }
 
-            $this->FindIQLanguages = $this->FindIQ->getLanguages();
+            $this->FindIQLanguages = $this->cache->get('find_iq_languages');
+            if(!$this->FindIQLanguages){
+                $this->FindIQLanguages = $this->FindIQ->getLanguages();
+                $this->cache->set('find_iq_languages', $this->FindIQLanguages, 3600);
+            }
 
 
             if (in_array('categories', $this->actions)) {

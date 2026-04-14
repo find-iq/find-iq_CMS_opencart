@@ -94,8 +94,17 @@ class ModelToolFindIQCron extends Model
         $products = $this->db->query($sql)->rows;
 
         foreach ($products as &$product) {
-            if(isset($product['status'])){
+            if (isset($product['status'])) {
                 $product['status'] = (int)$product['status'];
+            }
+            if (isset($product['price'])) {
+                $product['price'] = (float)$product['price'];
+            }
+            if (array_key_exists('sale_price', $product)) {
+                $product['sale_price'] = $product['sale_price'] !== null ? (float)$product['sale_price'] : null;
+            }
+            if (isset($product['quantity'])) {
+                $product['quantity'] = (int)$product['quantity'];
             }
         }
 
