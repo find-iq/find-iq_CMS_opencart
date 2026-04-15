@@ -137,8 +137,9 @@ $remaining = $db->query(
     . " WHERE first_synced IS NULL AND rejected = 0"
 );
 
-// Only respawn if lock file still exists (not removed by action=stop)
-if ((int)$remaining->row['cnt'] > 0 && is_file($lockFile)) {
+// Only respawn if launched via webhook (time param present) AND lock still exists (not removed by action=stop)
+$isWebhookLaunch = isset($get_params['time']) && (int)$get_params['time'] > 0;
+if ($isWebhookLaunch && (int)$remaining->row['cnt'] > 0 && is_file($lockFile)) {
     $phpBin   = PHP_BINARY ?: 'php';
     $selfFile = __FILE__;
     $passArgs = implode(' ', array_slice($argv, 1));
