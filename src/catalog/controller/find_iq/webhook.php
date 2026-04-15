@@ -56,6 +56,11 @@ class ControllerFindIqWebhook extends Controller
             return;
         }
 
+        if ($action === 'stop') {
+            $this->handleStop();
+            return;
+        }
+
         // 3. Parse start params
         $mode    = $this->request->get['mode'] ?? 'fast';
         $actions = $this->request->get['actions'] ?? 'products';
@@ -150,6 +155,34 @@ class ControllerFindIqWebhook extends Controller
                 'synced'   => (int)($row['synced']   ?? 0),
                 'rejected' => (int)($row['rejected'] ?? 0),
             ],
+        ]));
+    }
+
+    private function handleStop(): void
+    {
+        $lockFile = $this->getLockFile();
+
+        if (!is_file($lockFile)) {
+            $this->response->setOutput(json_encode([
+                'status'  => 'not_running',
+                'message' => 'No sync process is running',
+            ]));
+            return;
+        }
+
+        $pid     = (int)trim(file_get_contents($lockFile));
+        $running = $pid > 0 && file_exists('/proc/' . $pid);
+
+        if ($running) {
+            posix_kill($pid, SIGTERM);
+        }
+
+        @unlink($lockFile);
+
+        $this->response->setOutput(json_encode([
+            'status'  => $running ? 'stopped' : 'not_running',
+            'pid'     => $pid,
+            'message' => $running ? 'Sync process terminated' : 'Process was already dead, lock removed',
         ]));
     }
 }
