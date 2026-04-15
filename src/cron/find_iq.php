@@ -144,9 +144,9 @@ $remaining = $db->query(
     . " WHERE first_synced IS NULL AND rejected = 0"
 );
 
-// Only webhook-launched processes (time param present) manage the lock and respawn
-$isWebhookLaunch = isset($get_params['time']) && (int)$get_params['time'] > 0;
-if ($isWebhookLaunch) {
+// Only product sync processes manage the lock and respawn (not actions=frontend etc.)
+$hasProductSync = in_array('products', explode(',', $get_params['actions'] ?? ''));
+if ($hasProductSync) {
     if ((int)$remaining->row['cnt'] > 0) {
         $phpBin   = PHP_BINARY ?: 'php';
         $selfFile = __FILE__;
