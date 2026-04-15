@@ -9,7 +9,7 @@
  *
  * GET params:
  *   secret     — shop token (must match module_find_iq_integration_config['token'])
- *   action     — start (default) | status
+ *   action     — start (default) | status | stop | frontend
  *   mode       — fast (price/qty) | full (default: fast)
  *   actions    — comma-separated: products, categories, frontend (default: products)
  *   batch_size — products per API batch (default: 10)
@@ -58,6 +58,11 @@ class ControllerFindIqWebhook extends Controller
 
         if ($action === 'stop') {
             $this->handleStop();
+            return;
+        }
+
+        if ($action === 'frontend') {
+            $this->handleFrontend();
             return;
         }
 
@@ -164,6 +169,39 @@ class ControllerFindIqWebhook extends Controller
                 'synced'   => (int)($row['synced']   ?? 0),
                 'rejected' => (int)($row['rejected'] ?? 0),
             ],
+        ]));
+    }
+
+    private function handleFrontend(): void
+    {
+        $this->load->library('FindIQ');
+        $this->load->model('tool/find_iq_cron');
+
+        $raw      = $this->FindIQ->getFrontendScript();
+        $frontend = json_decode($raw, true);
+
+        if (!isset($frontend['css_url']) || !isset($frontend['js_url'])) {
+            $this->response->setOutput(json_encode([
+                'status'  => 'error',
+                'message' => 'Invalid response from FindIQ API',
+                'raw'     => $raw,
+            ]));
+            return;
+        }
+
+        try {
+            $frontend['updated_at'] = (new DateTime($frontend['updated_at']))->getTimestamp();
+        } catch (Exception $e) {
+            $frontend['updated_at'] = (new DateTime())->getTimestamp();
+        }
+
+        $this->model_tool_find_iq_cron->updateFrontend($frontend);
+
+        $this->response->setOutput(json_encode([
+            'status'     => 'updated',
+            'css_url'    => $frontend['css_url'],
+            'js_url'     => $frontend['js_url'],
+            'updated_at' => $frontend['updated_at'],
         ]));
     }
 
