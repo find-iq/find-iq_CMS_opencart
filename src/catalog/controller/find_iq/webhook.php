@@ -169,36 +169,27 @@ class ControllerFindIqWebhook extends Controller
 
     private function handleStop(): void
     {
-        $lockFile = $this->getLockFile();
-
-        // Write stop flag first — prevents any already-spawned next process from starting.
-        // This is independent of the start/respawn mechanism.
+        // Write stop flag first — it persists on disk until action=start removes it.
+        // Every spawned cron process checks this flag and exits without deleting it,
+        // so the entire respawn chain is reliably halted.
         file_put_contents(DIR_STORAGE . 'find_iq_sync.stop', '1');
 
-        if (!is_file($lockFile)) {
-            $this->response->setOutput(json_encode([
-                'status'  => 'not_running',
-                'message' => 'No sync process is running (stop flag written)',
-            ]));
-            return;
+        // Kill ALL currently running find_iq.php processes regardless of PID in lock.
+        // This handles the race where a new process was spawned just before stop ran.
+        shell_exec('pkill -KILL -f "find_iq.php" 2>/dev/null');
+
+        $lockFile = $this->getLockFile();
+        $pid      = null;
+
+        if (is_file($lockFile)) {
+            $pid = (int)trim(file_get_contents($lockFile));
+            @unlink($lockFile);
         }
-
-        $pid     = (int)trim(file_get_contents($lockFile));
-        $running = $pid > 0 && file_exists('/proc/' . $pid);
-
-        if ($running) {
-            // Kill the main process
-            posix_kill($pid, SIGKILL);
-            // Kill any child processes spawned by it (e.g. nohup sub-shells)
-            shell_exec('pkill -KILL -P ' . (int)$pid . ' 2>/dev/null');
-        }
-
-        @unlink($lockFile);
 
         $this->response->setOutput(json_encode([
-            'status'  => $running ? 'stopped' : 'not_running',
+            'status'  => 'stopped',
             'pid'     => $pid,
-            'message' => $running ? 'Sync process and children terminated' : 'Process was already dead, lock removed',
+            'message' => 'Stop flag written and all sync processes killed',
         ]));
     }
 }

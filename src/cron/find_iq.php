@@ -13,10 +13,11 @@ if (is_file($config_file)) {
     exit('Config is not found' . PHP_EOL);
 }
 
-// Stop flag: if action=stop was called, do not run sync
+// Stop flag: if action=stop was called, do not run sync.
+// The flag is NOT deleted here — it persists until action=start removes it.
+// This ensures every respawned process also exits, not just the first one.
 $stopFlag = DIR_STORAGE . 'find_iq_sync.stop';
 if (is_file($stopFlag)) {
-    @unlink($stopFlag);
     exit('Stopped by stop flag' . PHP_EOL);
 }
 
