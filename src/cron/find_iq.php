@@ -144,27 +144,20 @@ $remaining = $db->query(
     . " WHERE first_synced IS NULL AND rejected = 0"
 );
 
-// Only webhook-launched processes manage the lock and respawn.
-// Webhook writes find_iq_sync.webhook marker before spawning — reliable
-// regardless of whether $argv / register_argc_argv is available.
-$webhookMarker = DIR_STORAGE . 'find_iq_sync.webhook';
-$isWebhookLaunch = is_file($webhookMarker);
-if ($isWebhookLaunch) {
-    if ((int)$remaining->row['cnt'] > 0) {
-        $phpBin   = PHP_BINARY ?: 'php';
-        $selfFile = __FILE__;
-        $passArgs = implode(' ', array_slice($argv, 1));
-        $cmd      = sprintf(
-            'nohup %s %s %s > /dev/null 2>&1 & echo $!',
-            escapeshellarg($phpBin),
-            escapeshellarg($selfFile),
-            $passArgs
-        );
-        $newPid = (int)trim(shell_exec($cmd));
-        file_put_contents($lockFile, $newPid);
-    } else {
-        if (is_file($lockFile)) {
-            @unlink($lockFile);
-        }
+if ((int)$remaining->row['cnt'] > 0) {
+    $phpBin   = PHP_BINARY ?: 'php';
+    $selfFile = __FILE__;
+    $passArgs = implode(' ', array_slice($argv, 1));
+    $cmd      = sprintf(
+        'nohup %s %s %s > /dev/null 2>&1 & echo $!',
+        escapeshellarg($phpBin),
+        escapeshellarg($selfFile),
+        $passArgs
+    );
+    $newPid = (int)trim(shell_exec($cmd));
+    file_put_contents($lockFile, $newPid);
+} else {
+    if (is_file($lockFile)) {
+        @unlink($lockFile);
     }
 }

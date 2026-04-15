@@ -165,10 +165,14 @@ class ControllerFindIqWebhook extends Controller
     {
         $lockFile = $this->getLockFile();
 
+        // Write stop flag first — prevents any already-spawned next process from starting.
+        // This is independent of the start/respawn mechanism.
+        file_put_contents(DIR_STORAGE . 'find_iq_sync.stop', '1');
+
         if (!is_file($lockFile)) {
             $this->response->setOutput(json_encode([
                 'status'  => 'not_running',
-                'message' => 'No sync process is running',
+                'message' => 'No sync process is running (stop flag written)',
             ]));
             return;
         }
@@ -176,11 +180,11 @@ class ControllerFindIqWebhook extends Controller
         $pid     = (int)trim(file_get_contents($lockFile));
         $running = $pid > 0 && file_exists('/proc/' . $pid);
 
-        // Write stop flag — prevents already-spawned next process from running
-        file_put_contents(DIR_STORAGE . 'find_iq_sync.stop', '1');
-
         if ($running) {
+            // Kill the main process
             posix_kill($pid, SIGKILL);
+            // Kill any child processes spawned by it (e.g. nohup sub-shells)
+            shell_exec('pkill -KILL -P ' . (int)$pid . ' 2>/dev/null');
         }
 
         @unlink($lockFile);
@@ -188,7 +192,7 @@ class ControllerFindIqWebhook extends Controller
         $this->response->setOutput(json_encode([
             'status'  => $running ? 'stopped' : 'not_running',
             'pid'     => $pid,
-            'message' => $running ? 'Sync process terminated' : 'Process was already dead, lock removed',
+            'message' => $running ? 'Sync process and children terminated' : 'Process was already dead, lock removed',
         ]));
     }
 }
