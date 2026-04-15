@@ -144,9 +144,12 @@ $remaining = $db->query(
     . " WHERE first_synced IS NULL AND rejected = 0"
 );
 
-// Only product sync processes manage the lock and respawn (not actions=frontend etc.)
-$hasProductSync = in_array('products', explode(',', $get_params['actions'] ?? ''));
-if ($hasProductSync) {
+// Only webhook-launched processes manage the lock and respawn.
+// Webhook writes find_iq_sync.webhook marker before spawning — reliable
+// regardless of whether $argv / register_argc_argv is available.
+$webhookMarker = DIR_STORAGE . 'find_iq_sync.webhook';
+$isWebhookLaunch = is_file($webhookMarker);
+if ($isWebhookLaunch) {
     if ((int)$remaining->row['cnt'] > 0) {
         $phpBin   = PHP_BINARY ?: 'php';
         $selfFile = __FILE__;

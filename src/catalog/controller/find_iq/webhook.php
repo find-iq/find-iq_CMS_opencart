@@ -99,6 +99,9 @@ class ControllerFindIqWebhook extends Controller
         $phpBin   = PHP_BINARY ?: 'php';
         $cronFile = DIR_BASE . 'cron/find_iq.php';
 
+        // Write webhook marker so cron knows it was launched by webhook (not manual cron)
+        file_put_contents(DIR_STORAGE . 'find_iq_sync.webhook', '1');
+
         $args = 'mode=' . escapeshellarg($mode)
             . ' actions=' . escapeshellarg($actions)
             . ' batch_size=' . (int)$batch
