@@ -13,6 +13,14 @@ if (is_file($config_file)) {
     exit('Config is not found' . PHP_EOL);
 }
 
+// Stop flag: if action=stop was called, do not run sync.
+// The flag is NOT deleted here — it persists until action=start removes it.
+// This ensures every respawned process also exits, not just the first one.
+$stopFlag = DIR_STORAGE . 'find_iq_sync.stop';
+if (is_file($stopFlag)) {
+    exit('Stopped by stop flag' . PHP_EOL);
+}
+
 if (!defined('VERSION')) {
     define('VERSION', '3.0.2.0');
 }
@@ -127,3 +135,35 @@ $controller->execute($registry);
 
 // Вивід
 $response->output();
+
+// Self-respawn: if products remain — spawn new process and update lock;
+// otherwise remove lock to signal completion.
+$lockFile = DIR_STORAGE . 'find_iq_sync.lock';
+
+$remaining = $db->query(
+    "SELECT COUNT(*) AS cnt FROM `" . DB_PREFIX . "find_iq_sync_products`"
+    . " WHERE first_synced IS NULL AND rejected = 0"
+);
+
+if (is_file($stopFlag)) {
+    // Stop was requested — do not respawn, just clean up the lock.
+    if (is_file($lockFile)) {
+        @unlink($lockFile);
+    }
+} elseif ((int)$remaining->row['cnt'] > 0) {
+    $phpBin   = PHP_BINARY ?: 'php';
+    $selfFile = __FILE__;
+    $passArgs = implode(' ', array_slice($argv, 1));
+    $cmd      = sprintf(
+        'nohup %s %s %s > /dev/null 2>&1 & echo $!',
+        escapeshellarg($phpBin),
+        escapeshellarg($selfFile),
+        $passArgs
+    );
+    $newPid = (int)trim(shell_exec($cmd));
+    file_put_contents($lockFile, $newPid);
+} else {
+    if (is_file($lockFile)) {
+        @unlink($lockFile);
+    }
+}
