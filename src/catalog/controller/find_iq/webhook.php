@@ -93,7 +93,13 @@ class ControllerFindIqWebhook extends Controller
             $this->model_tool_find_iq_cron->resetSyncState();
         }
 
-        // 6. Build CLI command and launch background process
+        // 6. Clear stop flag if present (user called stop then start — start wins)
+        $stopFlag = DIR_STORAGE . 'find_iq_sync.stop';
+        if (is_file($stopFlag)) {
+            @unlink($stopFlag);
+        }
+
+        // 7. Build CLI command and launch background process
         // time=50 — voluntary stop before server kills the process;
         // cron/find_iq.php will respawn itself if products remain
         $phpBin   = PHP_BINARY ?: 'php';
