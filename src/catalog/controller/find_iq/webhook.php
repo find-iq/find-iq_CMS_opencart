@@ -22,6 +22,45 @@ class ControllerFindIqWebhook extends Controller
         return DIR_STORAGE . 'find_iq_sync.lock';
     }
 
+    /**
+     * Resolve a CLI PHP binary matching the current FPM version.
+     * Tries admin override first, then common paths on Debian/Ubuntu,
+     * cPanel EasyApache, Plesk, and CentOS/Remi. Falls back to PHP_BINARY
+     * only if it is not the FPM binary.
+     */
+    private function resolvePhpBinary(array $config): string
+    {
+        $override = isset($config['php_binary']) ? trim((string)$config['php_binary']) : '';
+        if ($override !== '' && is_file($override) && is_executable($override)) {
+            return $override;
+        }
+
+        $v     = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;
+        $vflat = PHP_MAJOR_VERSION . PHP_MINOR_VERSION;
+
+        $candidates = [
+            '/usr/bin/php' . $v,
+            '/opt/cpanel/ea-php' . $vflat . '/root/usr/bin/php',
+            '/opt/plesk/php/' . $v . '/bin/php',
+            '/opt/remi/php' . $vflat . '/root/usr/bin/php',
+            '/usr/local/bin/php' . $v,
+            '/usr/local/bin/php',
+            '/usr/bin/php',
+        ];
+
+        foreach ($candidates as $path) {
+            if (is_file($path) && is_executable($path)) {
+                return $path;
+            }
+        }
+
+        if (defined('PHP_BINARY') && PHP_BINARY && strpos(PHP_BINARY, 'fpm') === false) {
+            return PHP_BINARY;
+        }
+
+        return 'php';
+    }
+
     public function index()
     {
         $this->response->addHeader('Content-Type: application/json');
@@ -106,8 +145,13 @@ class ControllerFindIqWebhook extends Controller
 
         // 7. Build CLI command and launch background process
         // time=50 — voluntary stop before server kills the process;
-        // cron/find_iq.php will respawn itself if products remain
-        $phpBin   = PHP_BINARY ?: 'php';
+        // cron/find_iq.php will respawn itself if products remain.
+        //
+        // Resolve a CLI PHP binary matching the current version. PHP_BINARY
+        // in FPM context points to /usr/sbin/php-fpmX.Y which cannot run scripts,
+        // so we need the CLI binary (e.g. /usr/bin/php7.4). Admin can override
+        // via module config → php_binary.
+        $phpBin   = $this->resolvePhpBinary($config);
         $cronFile = DIR_BASE . 'cron/find_iq.php';
 
         // Write webhook marker so cron knows it was launched by webhook (not manual cron)
