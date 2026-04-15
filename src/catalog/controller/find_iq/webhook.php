@@ -173,6 +173,9 @@ class ControllerFindIqWebhook extends Controller
         $pid     = (int)trim(file_get_contents($lockFile));
         $running = $pid > 0 && file_exists('/proc/' . $pid);
 
+        // Write stop flag — prevents already-spawned next process from running
+        file_put_contents(DIR_STORAGE . 'find_iq_sync.stop', '1');
+
         if ($running) {
             posix_kill($pid, SIGKILL);
         }
