@@ -137,9 +137,7 @@ $remaining = $db->query(
     . " WHERE first_synced IS NULL AND rejected = 0"
 );
 
-// Only respawn if launched via webhook (time param present)
-$isWebhookLaunch = isset($get_params['time']) && (int)$get_params['time'] > 0;
-if ($isWebhookLaunch && (int)$remaining->row['cnt'] > 0) {
+if ((int)$remaining->row['cnt'] > 0) {
     $phpBin   = PHP_BINARY ?: 'php';
     $selfFile = __FILE__;
     $passArgs = implode(' ', array_slice($argv, 1));
