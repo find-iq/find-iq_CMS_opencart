@@ -174,7 +174,7 @@ class ControllerFindIqWebhook extends Controller
         $running = $pid > 0 && file_exists('/proc/' . $pid);
 
         if ($running) {
-            posix_kill($pid, SIGTERM);
+            posix_kill($pid, SIGKILL);
         }
 
         @unlink($lockFile);

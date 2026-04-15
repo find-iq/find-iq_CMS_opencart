@@ -137,7 +137,8 @@ $remaining = $db->query(
     . " WHERE first_synced IS NULL AND rejected = 0"
 );
 
-if ((int)$remaining->row['cnt'] > 0) {
+// Only respawn if lock file still exists (not removed by action=stop)
+if ((int)$remaining->row['cnt'] > 0 && is_file($lockFile)) {
     $phpBin   = PHP_BINARY ?: 'php';
     $selfFile = __FILE__;
     $passArgs = implode(' ', array_slice($argv, 1));
