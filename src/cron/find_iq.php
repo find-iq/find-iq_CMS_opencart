@@ -145,7 +145,12 @@ $remaining = $db->query(
     . " WHERE first_synced IS NULL AND rejected = 0"
 );
 
-if ((int)$remaining->row['cnt'] > 0) {
+if (is_file($stopFlag)) {
+    // Stop was requested — do not respawn, just clean up the lock.
+    if (is_file($lockFile)) {
+        @unlink($lockFile);
+    }
+} elseif ((int)$remaining->row['cnt'] > 0) {
     $phpBin   = PHP_BINARY ?: 'php';
     $selfFile = __FILE__;
     $passArgs = implode(' ', array_slice($argv, 1));
