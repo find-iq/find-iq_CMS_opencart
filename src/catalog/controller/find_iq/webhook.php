@@ -89,7 +89,7 @@ class ControllerFindIqWebhook extends Controller
         }
 
         // 6. Build CLI command and launch background process
-        // time=55 — voluntary stop before server kills the process;
+        // time=50 — voluntary stop before server kills the process;
         // cron/find_iq.php will respawn itself if products remain
         $phpBin   = PHP_BINARY ?: 'php';
         $cronFile = DIR_BASE . 'cron/find_iq.php';
@@ -97,7 +97,7 @@ class ControllerFindIqWebhook extends Controller
         $args = 'mode=' . escapeshellarg($mode)
             . ' actions=' . escapeshellarg($actions)
             . ' batch_size=' . (int)$batch
-            . ' time=55';
+            . ' time=50';
 
         $cmd = sprintf(
             'nohup %s %s %s > /dev/null 2>&1 & echo $!',
