@@ -313,8 +313,15 @@ class ControllerToolFindIQCron extends Controller
         int    $offset_hours
     ): bool {
         $processed = 0;
+        $stopFlag  = DIR_STORAGE . 'find_iq_sync.stop';
 
         while (true) {
+            // Check stop flag on every iteration — stopper just writes this file.
+            if (is_file($stopFlag)) {
+                echo 'Stop flag detected, halting.' . PHP_EOL;
+                return true;
+            }
+
             $to_update = $this->getProductsListToSync($api_mode, $batch_size, $offset_hours, $priority);
 
             if (empty($to_update['products'])) {

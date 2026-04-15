@@ -169,14 +169,9 @@ class ControllerFindIqWebhook extends Controller
 
     private function handleStop(): void
     {
-        // Write stop flag first — it persists on disk until action=start removes it.
-        // Every spawned cron process checks this flag and exits without deleting it,
-        // so the entire respawn chain is reliably halted.
+        // Write stop flag — the running cron checks this flag on every batch iteration
+        // and halts immediately when found. The flag persists until action=start removes it.
         file_put_contents(DIR_STORAGE . 'find_iq_sync.stop', '1');
-
-        // Kill ALL currently running find_iq.php processes regardless of PID in lock.
-        // This handles the race where a new process was spawned just before stop ran.
-        shell_exec('pkill -KILL -f "find_iq.php" 2>/dev/null');
 
         $lockFile = $this->getLockFile();
         $pid      = null;
@@ -189,7 +184,7 @@ class ControllerFindIqWebhook extends Controller
         $this->response->setOutput(json_encode([
             'status'  => 'stopped',
             'pid'     => $pid,
-            'message' => 'Stop flag written and all sync processes killed',
+            'message' => 'Stop flag written — sync will halt after current batch',
         ]));
     }
 }
