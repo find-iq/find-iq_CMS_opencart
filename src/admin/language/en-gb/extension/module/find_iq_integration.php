@@ -22,6 +22,10 @@ $_['text_fast_reindex_timeout'] = 'Hourly interval for fast updates (prices, pro
 $_['text_fast_reindex_timeout_placeholder'] = 'Recommended values 1-8 for most stores';
 $_['text_resize'] = 'Resize dimensions';
 $_['text_resize_pattern'] = '%spx x %spx';
+$_['text_image_processor'] = 'Image processor';
+$_['text_image_processor_gd'] = 'Built-in (GD) — recommended';
+$_['text_image_processor_opencart'] = 'OpenCart (may require Imagick)';
+$_['text_image_processor_help'] = 'If sync fails with "Class Imagick not found" — use the built-in GD processor.';
 $_['text_docs'] = 'Information and documentation';
 $_['text_version'] = 'Version: %s';
 $_['text_src'] = '<a href="%s">Source code</a>';
