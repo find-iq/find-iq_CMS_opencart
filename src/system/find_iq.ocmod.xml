@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<modification>
+    <name>Find-IQ</name>
+    <code>find_iq</code>
+    <version>3.x</version>
+    <author>Mykola Hlushpenko</author>
+    <link>https://hlushpenko.top</link>
+    <file path="catalog/controller/common/header.php">
+        <operation>
+            <search><![CDATA[public function index()]]></search>
+            <add position="after"><![CDATA[
+
+        if(isset($this->request->get['route']) && $this->request->get['route'] == 'product/product' && isset($this->request->get['product_id'])){
+          $this->load->model('tool/find_iq_cron');
+
+          foreach($this->model_tool_find_iq_cron->getProductQtyData((int)$this->request->get['product_id']) as $key => $value){
+            $data['data_product'][$key] = $value;
+          }
+        }
+
+        if(
+          $this->config->get('module_find_iq_integration_status') == '1'
+          &&
+          !empty($this->config->get('module_find_iq_integration_frontend'))
+        ) {
+          $frontend = $this->config->get('module_find_iq_integration_frontend');
+
+          $this->document->addStyle($frontend['css_url'] . '?' . $frontend['updated_at']);
+          $this->document->addScript($frontend['js_url'] . '?' . $frontend['updated_at']);
+        }
+
+
+      ]]></add>
+        </operation>
+    </file>
+    <file path="catalog/view/theme/*/template/common/header.twig">
+        <operation>
+            <search><![CDATA[<body]]></search>
+            <add position="replace"><![CDATA[<body {% if data_product is defined %}{% for key, value in data_product %}data-{{ key }}="{{ value}}" {% endfor %}{% endif %} ]]></add>
+        </operation>
+    </file>
+
+
+    <file path="catalog/model/catalog/product.php">
+        <operation>
+            <search><![CDATA[$query = $this->db->query("SELECT * FROM " . DB_PREFIX . "product_related]]></search>
+            <add position="after"><![CDATA[
+
+		if($this->db->countAffected() == 0 && $this->config->get('module_find_iq_integration_similar') == '1'){
+
+			$query->rows = [];
+
+			$this->load->library('FindIQ');
+
+			$response = $this->FindIQ->getSearchSimilar($product_id, ['limit' => 10, 'price_spread' => 40, 'same_category' => true, 'only_available' => true] );
+
+			if(!empty($response) && $response['data']['code'] == 200 && count($response['data']['data']['hits'] > 0)){
+
+			  foreach($response['data']['data']['hits'] as $hit){
+				$this->db->query('INSERT IGNORE INTO ' . DB_PREFIX . 'product_related SET product_id="'. $product_id . '", related_id = "' . $hit['product_id_ext'] . '"');
+				$query->rows[] = ['related_id' => $hit['product_id_ext']];
+			  }
+			}
+		}
+      ]]></add>
+        </operation>
+    </file>
+
+
+    <file path="system/library/cart/cart.php">
+        <operation>
+            <search><![CDATA[public function getProducts()]]></search>
+            <add position="before"><![CDATA[
+	public function getProductsFromCart(){
+		$products = [];
+
+		$sql  = "
+			SELECT product_id FROM " . DB_PREFIX . "cart
+			WHERE api_id = '" . (isset($this->session->data['api_id']) ? (int)$this->session->data['api_id'] : 0) . "'
+			AND customer_id = '" . (int)$this->customer->getId() . "'
+			AND session_id = '" . $this->db->escape($this->session->getId()) . "';
+		";
+
+		foreach($this->db->query($sql)->rows as $product){
+			$products[] = $product['product_id'];
+		}
+
+		return $products;
+	}
+      ]]></add>
+        </operation>
+    </file>
+
+
+    <file path="catalog/view/theme/*/template/common/footer.twig">
+        <operation>
+            <search><![CDATA[</footer>]]></search>
+            <add position="after"><![CDATA[
+          <script type="text/javascript">
+          async function getProductsFromCart() {
+              const response = await fetch(`index.php?route=api/find_iq/getProductsFromCart`);
+              if (!response.ok) {
+                  console.error('Server error:', response.status, response.statusText);
+                  return false;
+              }
+
+              return await response.json();
+          }
+
+          </script>
+          ]]></add>
+        </operation>
+    </file>
+</modification>

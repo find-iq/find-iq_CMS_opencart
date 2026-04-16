@@ -1,0 +1,250 @@
+{{ header }}
+{{ column_left }}
+<div id="content">
+    <div class="page-header">
+        <div class="container-fluid">
+            <div class="pull-right">
+                <div id="check-update-btn" class="btn btn-warning"><i class="fa fa-refresh"></i></div>
+                <button type="submit" form="form-module" data-toggle="tooltip" title="{{ button_save }}"
+                        class="btn btn-primary">
+                    <i class="fa fa-save"></i>
+                </button>
+                <a href="{{ cancel }}" data-toggle="tooltip" title="{{ button_cancel }}" class="btn btn-default">
+                    <i class="fa fa-reply"></i>
+                </a>
+            </div>
+            <h1>
+                {{ heading_title }}
+            </h1>
+            <ul class="breadcrumb">
+                {% for breadcrumb in breadcrumbs %}
+                    <li>
+                        <a href="{{ breadcrumb.href }}">
+                            {{ breadcrumb.text }}
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    <div class="container-fluid">
+        {% if error_warning %}
+            <div class="alert alert-danger alert-dismissible">
+                <i class="fa fa-exclamation-circle"></i>
+                {{ error_warning }}
+                <button type="button" class="close" data-dismiss="alert">
+                    &times;
+                </button>
+            </div>
+        {% endif %}
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h3 class="panel-title">
+                    <i class="fa fa-pencil"></i>
+                    {{ text_edit }}
+                </h3>
+            </div>
+            <div class="panel-body">
+                <ul class="nav nav-tabs">
+                    <li class="active"><a href="#tab-settings" data-toggle="tab">{{ text_edit }}</a></li>
+                    <li><a href="#tab-website" data-toggle="tab">{{ text_docs }}</a></li>
+                </ul>
+                <div class="tab-content">
+                    <div class="tab-pane active" id="tab-settings">
+                        <form action="{{ action }}" method="post" enctype="multipart/form-data" id="form-module"
+                              class="form-horizontal" style="margin-top:15px;">
+                            <div class="form-group">
+                                <label class="col-xs-12 col-sm-3 control-label" for="input-status">
+                                    {{ entry_status }}
+                                </label>
+                                <div class="col-xs-12 col-sm-3">
+                                    <select name="status" id="input-status" class="form-control">
+                                        {% if status %}
+                                            <option value="1" selected="selected">
+                                                {{ text_enabled }}
+                                            </option>
+                                            <option value="0">
+                                                {{ text_disabled }}
+                                            </option>
+                                        {% else %}
+                                            <option value="1">
+                                                {{ text_enabled }}
+                                            </option>
+                                            <option value="0" selected="selected">
+                                                {{ text_disabled }}
+                                            </option>
+                                        {% endif %}
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="resize-size" class="col-xs-12 col-sm-3 control-label">{{ text_resize }}</label>
+                                <div class="col-xs-12 col-sm-3">
+                                    <select name="resize_size" id="resize-size" class="form-control">
+                                        {% for resize_size, resize_size_text in resize_sizes %}
+                                            <option value="{{ resize_size }}" {% if resize_size == config['resize_size'] %}selected{% endif %}>{{ resize_size_text }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="image-processor" class="col-xs-12 col-sm-3 control-label">{{ text_image_processor }}</label>
+                                <div class="col-xs-12 col-sm-3">
+                                    <select name="image_processor" id="image-processor" class="form-control">
+                                        {% set current_processor = config['image_processor']|default('gd') %}
+                                        <option value="gd" {% if current_processor == 'gd' %}selected{% endif %}>{{ text_image_processor_gd }}</option>
+                                        <option value="opencart" {% if current_processor == 'opencart' %}selected{% endif %}>{{ text_image_processor_opencart }}</option>
+                                    </select>
+                                    <span class="help-block">{{ text_image_processor_help }}</span>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="token" class="col-xs-12 col-sm-3 control-label">{{ text_token }}</label>
+                                <div class="col-xs-12 col-sm-9">
+                                    <div class="input-group">
+                                        <div class="input-group-addon">
+                                            <i class="fa fa-user-secret"></i>
+                                        </div>
+                                        <input id="token" name="token" placeholder="{{ text_token_placeholder }}" type="text"
+                                               class="form-control" value="{{ config.token }}">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="full-reindex-timeout" class="col-xs-12 col-sm-9 control-label">{{ text_full_reindex_timeout }}</label>
+                                <div class="col-xs-12 col-sm-3">
+                                    <div class="input-group">
+                                        <input id="full-reindex-timeout" name="full_reindex_timeout"
+                                               placeholder="{{ text_full_reindex_timeout_placeholder }}"
+                                               type="number"
+                                               min="1"
+                                               max="408" step="1"
+                                               class="form-control"
+                                               value="{% if config['full_reindex_timeout'] is defined %}{{ config['full_reindex_timeout'] }}{% else %}24{% endif %}">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="fast-reindex-timeout" class="col-xs-12 col-sm-9 control-label">{{ text_fast_reindex_timeout }}</label>
+                                <div class="col-xs-12 col-sm-3 ">
+                                    <div class="input-group">
+                                        <input id="fast-reindex-timeout" name="fast_reindex_timeout"
+                                               placeholder="{{ text_fast_reindex_timeout_placeholder }}"
+                                               type="number"
+                                               min="1"
+                                               max="24" step="1"
+                                               class="form-control"
+                                               value="{% if config['fast_reindex_timeout'] is defined %}{{ config['fast_reindex_timeout'] }}{% else %}4{% endif %}">
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="tab-pane" id="tab-website" style="padding:15px 0;">
+                        <p>{{ text_version }}</p>
+                        <p>{{ text_src }}</p>
+
+                        <hr>
+
+                        <h4>{{ text_contacts_heading }}</h4>
+                        <ul class="list-unstyled" style="line-height:2;">
+                            <li>👉 {{ text_contacts_site }}: <a href="https://find-iq.com" target="_blank" rel="noopener">find-iq.com</a></li>
+                            <li>📈 {{ text_contacts_admin }}: <a href="https://app.find-iq.com" target="_blank" rel="noopener">app.find-iq.com</a></li>
+                            <li>📄 <a href="https://api.find-iq.com/v.2/api/public/docs" target="_blank" rel="noopener">{{ text_contacts_api_docs }}</a></li>
+                            <li>✈️ {{ text_contacts_write }}: <a href="https://t.me/find_iq_com_bot" target="_blank" rel="noopener">@find_iq_com_bot</a></li>
+                            <li>🔵 <a href="https://t.me/find_iq" target="_blank" rel="noopener">{{ text_contacts_telegram }}</a></li>
+                            <li>🎞 <a href="https://www.youtube.com/channel/UCu-jD1QWrJcvnxl6dqwCPPg" target="_blank" rel="noopener">{{ text_contacts_youtube }}</a></li>
+                            <li>🐱 <a href="https://github.com/find-iq" target="_blank" rel="noopener">{{ text_contacts_github }}</a></li>
+                        </ul>
+
+                        <hr>
+
+                        <h4>{{ text_webhook_heading }}</h4>
+                        {% if config['token'] is defined and config['token'] %}
+                            <p class="text-muted">{{ text_webhook_help }}</p>
+                            {% set webhook_secret = webhook_base_url ~ '&secret=' ~ config['token'] %}
+                            {% set webhook_links = {
+                                (text_webhook_start_full): webhook_secret ~ '&action=start&mode=full&actions=categories,products&batch_size=50',
+                                (text_webhook_start_fast): webhook_secret ~ '&action=start&mode=fast&actions=products&batch_size=50',
+                                (text_webhook_status):     webhook_secret ~ '&action=status',
+                                (text_webhook_stop):       webhook_secret ~ '&action=stop',
+                                (text_webhook_frontend):   webhook_secret ~ '&action=frontend'
+                            } %}
+                            {% for label, url in webhook_links %}
+                                <div class="form-group" style="margin-bottom:10px;">
+                                    <label style="display:block; margin-bottom:4px;"><strong>{{ label }}</strong></label>
+                                    <div class="input-group">
+                                        <input type="text" readonly class="form-control" value="{{ url }}" onclick="this.select();">
+                                        <span class="input-group-btn">
+                                            <button type="button" class="btn btn-default" data-toggle="tooltip" title="{{ text_webhook_copy }}"
+                                                    onclick="var i=this.parentNode.parentNode.querySelector('input'); i.select(); document.execCommand('copy');">
+                                                <i class="fa fa-copy"></i>
+                                            </button>
+                                        </span>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted"><em>{{ text_webhook_no_token }}</em></p>
+                        {% endif %}
+                    </div>
+                </div>
+            
+            
+            </div>
+        </div>
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                
+                <h3 class="panel-title">
+                    <i class="fa fa-exclamation-triangle"></i>
+                    {{ text_list }}
+                </h3>
+                <div class="pull-right ">
+                    <a href="{{ download }}" data-toggle="tooltip" title="{{ button_download }}"
+                       class="btn btn-sm btn-primary">
+                        <i class="fa fa-download"></i>
+                    </a>
+                    <a onclick="confirm('{{ text_confirm }}') ? location.href='{{ clear }}' : false;"
+                       data-toggle="tooltip" title="{{ button_clear }}" class="btn btn-sm btn-danger">
+                        <i class="fa fa-eraser"></i>
+                    </a>
+                </div>
+            
+            </div>
+            <div class="panel-body">
+        <textarea wrap="off" rows="25" readonly class="form-control">
+          {{ log }}
+        </textarea>
+            </div>
+        </div>
+    </div>
+</div>
+<script type="text/javascript"><!--
+    document.getElementById('check-update-btn').addEventListener('click', function () {
+        fetch('index.php?route=extension/module/find_iq_integration/checkNewVersion&user_token=' + (new URLSearchParams(window.location.search)).get('user_token'), {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(response => response.json())
+            .then(json => {
+                const alert = document.createElement('div');
+                alert.className = 'alert ' + json.alert_class + ' alert-dismissible';
+                alert.innerHTML = `<i class="fa fa-exclamation-circle"></i> ${json.message}<button type="button" class="close" data-dismiss="alert">&times;</button>`;
+
+                const existingAlerts = document.querySelectorAll('.alert');
+                existingAlerts.forEach(alert => alert.remove());
+
+                document.querySelector('.page-header').append(alert);
+            })
+            .catch(error => console.error('Error:', error));
+    });
+    //--></script>
+{{ footer }}
