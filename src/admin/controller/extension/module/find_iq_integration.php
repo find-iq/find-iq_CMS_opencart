@@ -103,6 +103,14 @@ class ControllerExtensionModuleFindIqIntegration extends Controller
             $data['resize_sizes'][$size] = sprintf($this->language->get('text_resize_pattern'), $size, $size);
         }
 
+        // Base URL of the storefront (catalog side) for building webhook
+        // helper links shown on the Documentation tab. HTTPS_CATALOG is
+        // defined in admin/config.php on every OC3 install.
+        $catalogBase = defined('HTTPS_CATALOG') && HTTPS_CATALOG
+            ? HTTPS_CATALOG
+            : (defined('HTTP_CATALOG') ? HTTP_CATALOG : '');
+        $data['webhook_base_url'] = rtrim($catalogBase, '/') . '/index.php?route=find_iq/webhook';
+
         $data['text_version'] = sprintf($this->language->get('text_version'), $this->getCurrentVersion());
         $data['text_src'] = sprintf($this->language->get('text_src'), $this->repo);
 
