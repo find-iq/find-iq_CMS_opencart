@@ -176,22 +176,19 @@
                                 (text_webhook_frontend):   webhook_secret ~ '&action=frontend'
                             } %}
                             {% for label, url in webhook_links %}
-                                <div class="form-group">
-                                    <label class="col-xs-12 col-sm-3 control-label">{{ label }}</label>
-                                    <div class="col-xs-12 col-sm-9">
-                                        <div class="input-group">
-                                            <input type="text" readonly class="form-control" value="{{ url }}" onclick="this.select();">
-                                            <span class="input-group-btn">
-                                                <button type="button" class="btn btn-default" data-toggle="tooltip" title="{{ text_webhook_copy }}"
-                                                        onclick="var i=this.parentNode.parentNode.querySelector('input'); i.select(); document.execCommand('copy');">
-                                                    <i class="fa fa-copy"></i>
-                                                </button>
-                                            </span>
-                                        </div>
+                                <div class="form-group" style="margin-bottom:10px;">
+                                    <label style="display:block; margin-bottom:4px;"><strong>{{ label }}</strong></label>
+                                    <div class="input-group">
+                                        <input type="text" readonly class="form-control" value="{{ url }}" onclick="this.select();">
+                                        <span class="input-group-btn">
+                                            <button type="button" class="btn btn-default" data-toggle="tooltip" title="{{ text_webhook_copy }}"
+                                                    onclick="var i=this.parentNode.parentNode.querySelector('input'); i.select(); document.execCommand('copy');">
+                                                <i class="fa fa-copy"></i>
+                                            </button>
+                                        </span>
                                     </div>
                                 </div>
                             {% endfor %}
-                            <div class="clearfix"></div>
                         {% else %}
                             <p class="text-muted"><em>{{ text_webhook_no_token }}</em></p>
                         {% endif %}
