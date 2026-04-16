@@ -88,7 +88,19 @@
                                     </select>
                                 </div>
                             </div>
-                            
+
+                            <div class="form-group">
+                                <label for="image-processor" class="col-xs-12 col-sm-3 control-label">{{ text_image_processor }}</label>
+                                <div class="col-xs-12 col-sm-3">
+                                    <select name="image_processor" id="image-processor" class="form-control">
+                                        {% set current_processor = config['image_processor']|default('gd') %}
+                                        <option value="gd" {% if current_processor == 'gd' %}selected{% endif %}>{{ text_image_processor_gd }}</option>
+                                        <option value="opencart" {% if current_processor == 'opencart' %}selected{% endif %}>{{ text_image_processor_opencart }}</option>
+                                    </select>
+                                    <span class="help-block">{{ text_image_processor_help }}</span>
+                                </div>
+                            </div>
+
                             <div class="form-group">
                                 <label for="token" class="col-xs-12 col-sm-3 control-label">{{ text_token }}</label>
                                 <div class="col-xs-12 col-sm-9">

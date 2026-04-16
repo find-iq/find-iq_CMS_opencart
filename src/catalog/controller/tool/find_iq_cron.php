@@ -25,6 +25,7 @@ class ControllerToolFindIQCron extends Controller
         if ($this->config->get('module_find_iq_integration_status') == '1') {
 
             $this->load->library('FindIQ');
+            $this->load->library('FindIQImage');
 
             // Dedicated cron log for per-portion timeline
             $cron_log = new Log('find_iq_integration_cron.log');
@@ -358,10 +359,21 @@ class ControllerToolFindIQCron extends Controller
                         unset($products[$product_key]['manufacturer']['descriptions']);
                     }
 
-                    if (is_file(DIR_IMAGE . $product['image'])) {
-                        $products[$product_key]['image'] = $this->model_tool_image->resize($product['image'], $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
+                    // Admin stores a single square size under "resize_size". The
+                    // legacy "resize-width" key is kept as a safety net for configs
+                    // saved before the key was normalised.
+                    $resizeSize = (int)($config['resize_size'] ?? $config['resize-width'] ?? 200);
+                    if ($resizeSize < 1) {
+                        $resizeSize = 200;
+                    }
+
+                    $imagePath      = is_file(DIR_IMAGE . $product['image']) ? $product['image'] : 'no_image.png';
+                    $imageProcessor = $config['image_processor'] ?? 'gd';
+
+                    if ($imageProcessor === 'opencart') {
+                        $products[$product_key]['image'] = $this->model_tool_image->resize($imagePath, $resizeSize, $resizeSize);
                     } else {
-                        $products[$product_key]['image'] = $this->model_tool_image->resize('no_image.png', $config['resize-width'] ?? '200', $config['resize-height'] ?? '200');
+                        $products[$product_key]['image'] = $this->FindIQImage->resize($imagePath, $resizeSize, $resizeSize);
                     }
 
                     foreach ($product['descriptions'] as $product_description_key => $description) {

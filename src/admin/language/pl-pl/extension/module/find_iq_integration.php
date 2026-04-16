@@ -25,6 +25,10 @@ $_['text_fast_reindex_timeout'] = 'Godzinowy interwał szybkiej aktualizacji (ce
 $_['text_fast_reindex_timeout_placeholder'] = 'Zalecane wartości 1-8 dla większości sklepów';
 $_['text_resize'] = 'Rozmiar skalowania';
 $_['text_resize_pattern'] = '%spx x %spx';
+$_['text_image_processor'] = 'Procesor obrazów';
+$_['text_image_processor_gd'] = 'Wbudowany (GD) — zalecane';
+$_['text_image_processor_opencart'] = 'OpenCart (może wymagać Imagick)';
+$_['text_image_processor_help'] = 'Jeśli synchronizacja kończy się błędem „Class Imagick not found" — użyj wbudowanego procesora GD.';
 $_['text_docs'] = 'Informacje i dokumentacja';
 $_['text_version'] = 'Wersja: %s';
 $_['text_src'] = '<a href="%s">Kod źródłowy</a>';
