@@ -31,7 +31,7 @@ exposes a full webhook API for managing indexing.
 ## Requirements
 
 - OpenCart 3.0.x or OcStore 3.0.x
-- PHP 7.4 or newer
+- PHP 7.4 or newer (tested on 7.4, 8.0, 8.1, 8.2, 8.3, 8.4)
 - MySQL / MariaDB
 - PHP extensions: cURL, GD (both ship with stock PHP)
 - `shell_exec` enabled — used to launch the background sync worker
