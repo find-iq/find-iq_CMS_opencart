@@ -169,10 +169,11 @@
                             <p class="text-muted">{{ text_webhook_help }}</p>
                             {% set webhook_secret = webhook_base_url ~ '&secret=' ~ config['token'] %}
                             {% set webhook_links = {
-                                (text_webhook_start):    webhook_secret ~ '&action=start&mode=full&actions=categories,products&batch_size=50',
-                                (text_webhook_status):   webhook_secret ~ '&action=status',
-                                (text_webhook_stop):     webhook_secret ~ '&action=stop',
-                                (text_webhook_frontend): webhook_secret ~ '&action=frontend'
+                                (text_webhook_start_full): webhook_secret ~ '&action=start&mode=full&actions=categories,products&batch_size=50',
+                                (text_webhook_start_fast): webhook_secret ~ '&action=start&mode=fast&actions=products&batch_size=50',
+                                (text_webhook_status):     webhook_secret ~ '&action=status',
+                                (text_webhook_stop):       webhook_secret ~ '&action=stop',
+                                (text_webhook_frontend):   webhook_secret ~ '&action=frontend'
                             } %}
                             {% for label, url in webhook_links %}
                                 <div class="form-group">

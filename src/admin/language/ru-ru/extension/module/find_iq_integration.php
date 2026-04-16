@@ -45,9 +45,10 @@ $_['text_contacts_github']    = 'GitHub';
 // Webhook quick-links block (Documentation tab)
 $_['text_webhook_heading']  = 'Быстрые URL вебхуков';
 $_['text_webhook_help']     = 'Готовые к копированию URL с текущим секретным токеном.';
-$_['text_webhook_start']    = 'Старт (полная заливка)';
-$_['text_webhook_status']   = 'Статус';
-$_['text_webhook_stop']     = 'Стоп';
+$_['text_webhook_start_full'] = 'Старт — полная заливка (новые + изменённые + переиндекс)';
+$_['text_webhook_start_fast'] = 'Старт — быстрое обновление (только цены и наличие)';
+$_['text_webhook_status']     = 'Статус';
+$_['text_webhook_stop']       = 'Стоп';
 $_['text_webhook_frontend'] = 'Обновить виджет (frontend)';
 $_['text_webhook_copy']     = 'Скопировать';
 $_['text_webhook_no_token'] = 'Задайте секретный токен в настройках и сохраните — здесь появятся готовые URL вебхуков.';

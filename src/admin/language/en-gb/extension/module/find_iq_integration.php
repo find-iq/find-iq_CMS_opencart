@@ -45,9 +45,10 @@ $_['text_contacts_github']    = 'GitHub';
 // Webhook quick-links block (Documentation tab)
 $_['text_webhook_heading']  = 'Quick webhook URLs';
 $_['text_webhook_help']     = 'Ready-to-copy URLs with your current secret token.';
-$_['text_webhook_start']    = 'Start (full sync)';
-$_['text_webhook_status']   = 'Status';
-$_['text_webhook_stop']     = 'Stop';
+$_['text_webhook_start_full'] = 'Start — full sync (new + changed + reindex)';
+$_['text_webhook_start_fast'] = 'Start — fast sync (prices & stock only)';
+$_['text_webhook_status']     = 'Status';
+$_['text_webhook_stop']       = 'Stop';
 $_['text_webhook_frontend'] = 'Update widget (frontend)';
 $_['text_webhook_copy']     = 'Copy to clipboard';
 $_['text_webhook_no_token'] = 'Set a secret token in the settings and save to see webhook URLs here.';
