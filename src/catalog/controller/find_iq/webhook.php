@@ -104,11 +104,21 @@ class ControllerFindIqWebhook extends Controller
             @unlink($stopFlag);
         }
 
-        // 7. Build CLI command and launch background process
-        // time=50 — voluntary stop before server kills the process;
-        // cron/find_iq.php will respawn itself if products remain
-        $phpBin   = PHP_BINARY ?: 'php';
-        $cronFile = DIR_BASE . 'cron/find_iq.php';
+        // 7. Build CLI command and launch background process.
+        // time=50 — voluntary stop before the server kills the process;
+        // cron/find_iq.php will respawn itself if products remain.
+        //
+        // PHP_BINARY in an FPM request points to /usr/sbin/php-fpmX.Y which
+        // cannot execute a script, so fall back to "php" from PATH in that
+        // case. That resolves to the CLI binary on any sanely configured host.
+        $phpBin = (defined('PHP_BINARY') && PHP_BINARY && strpos(PHP_BINARY, 'fpm') === false)
+            ? PHP_BINARY
+            : 'php';
+
+        // DIR_BASE is not a standard OpenCart 3 constant; some configs define it,
+        // others don't. Derive the OC root from DIR_APPLICATION (which always
+        // points to catalog/) by stripping the trailing catalog/ segment.
+        $cronFile = dirname(rtrim(DIR_APPLICATION, '/')) . '/cron/find_iq.php';
 
         // Write webhook marker so cron knows it was launched by webhook (not manual cron)
         file_put_contents(DIR_STORAGE . 'find_iq_sync.webhook', '1');
