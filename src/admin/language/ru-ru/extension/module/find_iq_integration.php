@@ -2,6 +2,10 @@
 
 // Heading
 $_['heading_name'] = 'Find-IQ Integration';
+
+// Error
+$_['error_warning'] = 'Файл лога <strong>%s</strong> слишком большой (%s) и не отображается ниже. Очистите или заархивируйте его.';
+
 $_['heading_title'] = '
     <span style="background: #fff; padding: 4px 0 4px 10px;border-radius: 4px;">
     <span style="color:#ff0000;text-shadow: none;font-weight: 500;">Find-IQ</span>
