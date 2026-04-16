@@ -31,6 +31,27 @@ $_['text_image_processor_gd'] = 'Built-in (GD) — recommended';
 $_['text_image_processor_opencart'] = 'OpenCart (may require Imagick)';
 $_['text_image_processor_help'] = 'If sync fails with "Class Imagick not found" — use the built-in GD processor.';
 $_['text_docs'] = 'Information and documentation';
+
+// Contacts block (Documentation tab)
+$_['text_contacts_heading']   = 'Contacts & resources';
+$_['text_contacts_site']      = 'Website';
+$_['text_contacts_admin']     = 'Admin panel';
+$_['text_contacts_api_docs']  = 'API documentation';
+$_['text_contacts_write']     = 'Contact us';
+$_['text_contacts_telegram']  = 'Telegram channel';
+$_['text_contacts_youtube']   = 'YouTube channel';
+$_['text_contacts_github']    = 'GitHub';
+
+// Webhook quick-links block (Documentation tab)
+$_['text_webhook_heading']  = 'Quick webhook URLs';
+$_['text_webhook_help']     = 'Ready-to-copy URLs with your current secret token.';
+$_['text_webhook_start_full'] = 'Start — full sync (new + changed + reindex)';
+$_['text_webhook_start_fast'] = 'Start — fast sync (prices & stock only)';
+$_['text_webhook_status']     = 'Status';
+$_['text_webhook_stop']       = 'Stop';
+$_['text_webhook_frontend'] = 'Update widget (frontend)';
+$_['text_webhook_copy']     = 'Copy to clipboard';
+$_['text_webhook_no_token'] = 'Set a secret token in the settings and save to see webhook URLs here.';
 $_['text_version'] = 'Version: %s';
 $_['text_src'] = '<a href="%s">Source code</a>';
 $_['text_new_version_available'] = 'New module version available: <b>%s</b>. Current version: <b>%s</b>. <a href="%s"><b>Download update</b></a>';

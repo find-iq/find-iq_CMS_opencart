@@ -30,6 +30,27 @@ $_['text_image_processor_gd'] = 'Wbudowany (GD) — zalecane';
 $_['text_image_processor_opencart'] = 'OpenCart (może wymagać Imagick)';
 $_['text_image_processor_help'] = 'Jeśli synchronizacja kończy się błędem „Class Imagick not found" — użyj wbudowanego procesora GD.';
 $_['text_docs'] = 'Informacje i dokumentacja';
+
+// Contacts block (Documentation tab)
+$_['text_contacts_heading']   = 'Kontakty i zasoby';
+$_['text_contacts_site']      = 'Strona WWW';
+$_['text_contacts_admin']     = 'Panel administracyjny';
+$_['text_contacts_api_docs']  = 'Dokumentacja API';
+$_['text_contacts_write']     = 'Napisz do nas';
+$_['text_contacts_telegram']  = 'Kanał Telegram';
+$_['text_contacts_youtube']   = 'Kanał YouTube';
+$_['text_contacts_github']    = 'GitHub';
+
+// Webhook quick-links block (Documentation tab)
+$_['text_webhook_heading']  = 'Szybkie adresy webhooków';
+$_['text_webhook_help']     = 'Gotowe do skopiowania adresy URL z bieżącym tajnym tokenem.';
+$_['text_webhook_start_full'] = 'Start — pełna synchronizacja (nowe + zmienione + reindeks)';
+$_['text_webhook_start_fast'] = 'Start — szybka aktualizacja (tylko ceny i dostępność)';
+$_['text_webhook_status']     = 'Status';
+$_['text_webhook_stop']       = 'Stop';
+$_['text_webhook_frontend'] = 'Aktualizuj widget (frontend)';
+$_['text_webhook_copy']     = 'Kopiuj do schowka';
+$_['text_webhook_no_token'] = 'Ustaw tajny token w ustawieniach i zapisz — tutaj pojawią się gotowe adresy webhooków.';
 $_['text_version'] = 'Wersja: %s';
 $_['text_src'] = '<a href="%s">Kod źródłowy</a>';
 $_['text_new_version_available'] = 'Dostępna jest nowa wersja modułu: <b>%s</b>. Aktualna wersja: <b>%s</b>. <a href="%s"><b>Pobierz aktualizację</b></a>';

@@ -148,6 +148,50 @@
                     <div class="tab-pane" id="tab-website" style="padding:15px 0;">
                         <p>{{ text_version }}</p>
                         <p>{{ text_src }}</p>
+
+                        <hr>
+
+                        <h4>{{ text_contacts_heading }}</h4>
+                        <ul class="list-unstyled" style="line-height:2;">
+                            <li>👉 {{ text_contacts_site }}: <a href="https://find-iq.com" target="_blank" rel="noopener">find-iq.com</a></li>
+                            <li>📈 {{ text_contacts_admin }}: <a href="https://app.find-iq.com" target="_blank" rel="noopener">app.find-iq.com</a></li>
+                            <li>📄 <a href="https://api.find-iq.com/v.2/api/public/docs" target="_blank" rel="noopener">{{ text_contacts_api_docs }}</a></li>
+                            <li>✈️ {{ text_contacts_write }}: <a href="https://t.me/find_iq_com_bot" target="_blank" rel="noopener">@find_iq_com_bot</a></li>
+                            <li>🔵 <a href="https://t.me/find_iq" target="_blank" rel="noopener">{{ text_contacts_telegram }}</a></li>
+                            <li>🎞 <a href="https://www.youtube.com/channel/UCu-jD1QWrJcvnxl6dqwCPPg" target="_blank" rel="noopener">{{ text_contacts_youtube }}</a></li>
+                            <li>🐱 <a href="https://github.com/find-iq" target="_blank" rel="noopener">{{ text_contacts_github }}</a></li>
+                        </ul>
+
+                        <hr>
+
+                        <h4>{{ text_webhook_heading }}</h4>
+                        {% if config['token'] is defined and config['token'] %}
+                            <p class="text-muted">{{ text_webhook_help }}</p>
+                            {% set webhook_secret = webhook_base_url ~ '&secret=' ~ config['token'] %}
+                            {% set webhook_links = {
+                                (text_webhook_start_full): webhook_secret ~ '&action=start&mode=full&actions=categories,products&batch_size=50',
+                                (text_webhook_start_fast): webhook_secret ~ '&action=start&mode=fast&actions=products&batch_size=50',
+                                (text_webhook_status):     webhook_secret ~ '&action=status',
+                                (text_webhook_stop):       webhook_secret ~ '&action=stop',
+                                (text_webhook_frontend):   webhook_secret ~ '&action=frontend'
+                            } %}
+                            {% for label, url in webhook_links %}
+                                <div class="form-group" style="margin-bottom:10px;">
+                                    <label style="display:block; margin-bottom:4px;"><strong>{{ label }}</strong></label>
+                                    <div class="input-group">
+                                        <input type="text" readonly class="form-control" value="{{ url }}" onclick="this.select();">
+                                        <span class="input-group-btn">
+                                            <button type="button" class="btn btn-default" data-toggle="tooltip" title="{{ text_webhook_copy }}"
+                                                    onclick="var i=this.parentNode.parentNode.querySelector('input'); i.select(); document.execCommand('copy');">
+                                                <i class="fa fa-copy"></i>
+                                            </button>
+                                        </span>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted"><em>{{ text_webhook_no_token }}</em></p>
+                        {% endif %}
                     </div>
                 </div>
             
