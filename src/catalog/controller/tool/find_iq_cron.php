@@ -346,47 +346,52 @@ class ControllerToolFindIQCron extends Controller
             if ($api_mode === 'full') {
                 echo '=';
 
+                $resizeSize = (int)($config['resize_size'] ?? $config['resize-width'] ?? 200);
+                if ($resizeSize < 1) {
+                    $resizeSize = 200;
+                }
+                $imageProcessor = $config['image_processor'] ?? 'gd';
+
                 foreach ($products as $product_key => $product) {
-                    foreach (array_keys($product) as $field) {
-                        if (!in_array($field, ['quantity'])) {
-                            if ($product[$field] == '' || $product[$field] === 0) {
-                                unset($products[$product_key][$field]);
+                    try {
+                        foreach (array_keys($product) as $field) {
+                            if (!in_array($field, ['quantity'])) {
+                                if ($product[$field] == '' || $product[$field] === 0) {
+                                    unset($products[$product_key][$field]);
+                                }
                             }
                         }
-                    }
 
-                    if (empty($product['manufacturer']['descriptions'])) {
-                        unset($products[$product_key]['manufacturer']['descriptions']);
-                    }
+                        if (empty($product['manufacturer']['descriptions'])) {
+                            unset($products[$product_key]['manufacturer']['descriptions']);
+                        }
 
-                    // Admin stores a single square size under "resize_size". The
-                    // legacy "resize-width" key is kept as a safety net for configs
-                    // saved before the key was normalised.
-                    $resizeSize = (int)($config['resize_size'] ?? $config['resize-width'] ?? 200);
-                    if ($resizeSize < 1) {
-                        $resizeSize = 200;
-                    }
+                        $imagePath = is_file(DIR_IMAGE . $product['image']) ? $product['image'] : 'no_image.png';
 
-                    $imagePath      = is_file(DIR_IMAGE . $product['image']) ? $product['image'] : 'no_image.png';
-                    $imageProcessor = $config['image_processor'] ?? 'gd';
+                        if ($imageProcessor === 'opencart') {
+                            $products[$product_key]['image'] = $this->model_tool_image->resize($imagePath, $resizeSize, $resizeSize);
+                        } else {
+                            $products[$product_key]['image'] = $this->FindIQImage->resize($imagePath, $resizeSize, $resizeSize);
+                        }
 
-                    if ($imageProcessor === 'opencart') {
-                        $products[$product_key]['image'] = $this->model_tool_image->resize($imagePath, $resizeSize, $resizeSize);
-                    } else {
-                        $products[$product_key]['image'] = $this->FindIQImage->resize($imagePath, $resizeSize, $resizeSize);
-                    }
+                        foreach ($product['descriptions'] as $product_description_key => $description) {
+                            $this->config->set('config_language_id', $description['language_id']);
+                            $products[$product_key]['descriptions'][$product_description_key]['url'] = html_entity_decode($this->url->link('product/product', 'product_id=' . $product['product_id_ext'], true));
+                        }
 
-                    foreach ($product['descriptions'] as $product_description_key => $description) {
-                        $this->config->set('config_language_id', $description['language_id']);
-                        $products[$product_key]['descriptions'][$product_description_key]['url'] = html_entity_decode($this->url->link('product/product', 'product_id=' . $product['product_id_ext'], true));
-                    }
+                        $products[$product_key]['categories'][] = $product['category_id'];
+                        unset($products[$product_key]['category_id']);
 
-                    $products[$product_key]['categories'][] = $product['category_id'];
-                    unset($products[$product_key]['category_id']);
+                        if ($product['category_id'] == '0') {
+                            unset($products[$product_key]);
+                            $rejected_products[$product['product_id_ext']] = 1;
+                        }
 
-                    if ($product['category_id'] == '0') {
+                    } catch (\Throwable $e) {
+                        $productId = $product['product_id_ext'] ?? '?';
+                        $this->log->write('FindIQ: product #' . $productId . ' skipped — ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+                        $rejected_products[$productId] = 1;
                         unset($products[$product_key]);
-                        $rejected_products[$product['product_id_ext']] = 1;
                     }
                 }
 
