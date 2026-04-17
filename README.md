@@ -1,6 +1,6 @@
 # Find-iQ — OpenCart 3 / OcStore integration module
 
-[![Version](https://img.shields.io/badge/version-0.6-blue)](https://github.com/find-iq/find-iq_CMS_opencart/releases)
+[![Version](https://img.shields.io/badge/version-0.6.1-blue)](https://github.com/find-iq/find-iq_CMS_opencart/releases)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
 [![OpenCart](https://img.shields.io/badge/OpenCart-3.x-orange)](https://www.opencart.com/)
 
@@ -105,7 +105,7 @@ Full parameter reference: [Wiki → Webhook API](https://github.com/find-iq/find
 
 See [GitHub Releases](https://github.com/find-iq/find-iq_CMS_opencart/releases).
 
-Current version: **0.6** — fire-and-forget webhook, self-respawn worker, built-in GD image resizer, quick webhook URLs in the admin.
+Current version: **0.6.1** — fire-and-forget webhook, self-respawn worker, built-in GD image resizer, quick webhook URLs in the admin.
 
 ---
 

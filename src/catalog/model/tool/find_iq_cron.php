@@ -123,8 +123,8 @@ class ModelToolFindIQCron extends Model
                     if ($product['product_id_ext'] == $description['product_id']) {
                         $product['descriptions'][] = array(
                             'language_id' => $description['language_id'],
-                            'name'        => $this->sanitaze(htmlspecialchars_decode($description['name'])),
-                            'description' => $this->sanitaze( html_entity_decode(htmlspecialchars_decode($description['description']))),
+                            'name'        => $this->sanitaze(html_entity_decode($description['name'], ENT_QUOTES | ENT_HTML5, 'UTF-8')),
+                            'description' => $this->sanitaze(html_entity_decode($description['description'], ENT_QUOTES | ENT_HTML5, 'UTF-8')),
                             'language_code' => $description['language_code'],
                         );
                     }
@@ -133,7 +133,7 @@ class ModelToolFindIQCron extends Model
                 foreach ($products_manufacturers as $manufacturer) {
                     if ($product['product_id_ext'] == $manufacturer['product_id']) {
                         $product['manufacturer'] = array(
-                            'name' => $manufacturer['name'],
+                            'name' => html_entity_decode($manufacturer['name'], ENT_QUOTES | ENT_HTML5, 'UTF-8'),
                             'descriptions' => array()
                         );
                     }
@@ -142,9 +142,9 @@ class ModelToolFindIQCron extends Model
                 foreach ($product_attributes as $attribute) {
                     if ($product['product_id_ext'] == $attribute['product_id']) {
                         $product['attributes'][] = array(
-                            'attribute_group' => $attribute['attribute_group'],
-                            'attribute_name' => $attribute['attribute_name'],
-                            'value' => $attribute['value'],
+                            'attribute_group' => html_entity_decode($attribute['attribute_group'], ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                            'attribute_name' => html_entity_decode($attribute['attribute_name'], ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                            'value' => html_entity_decode($attribute['value'], ENT_QUOTES | ENT_HTML5, 'UTF-8'),
                             'language_id' => $attribute['language_id'],
                         );
                     }
@@ -365,7 +365,7 @@ class ModelToolFindIQCron extends Model
         foreach ($categories as &$category) {
             $response[$category['category_id']]['descriptions'][] = [
                 'language_id' => $category['language_id'],
-                'name' => $category['name'],
+                'name' => html_entity_decode($category['name'], ENT_QUOTES | ENT_HTML5, 'UTF-8'),
                 'language_code' => $category['language_code'],
             ];
         }
@@ -492,11 +492,13 @@ class ModelToolFindIQCron extends Model
         // Колапсуємо множинні пробіли в один
         $text = preg_replace('/[ ]{2,}/', ' ', $text);
 
-        // Залишаємо лише літери, цифри і деякі розділові знаки
-        $text = preg_replace('/[^\p{L}\p{N}\s.,!?":;-]/u', '', $text);
-
         // Видаляємо емодзі (розширені діапазони Unicode для емодзі/піктограм)
         $text = preg_replace('/[\x{1F000}-\x{1FAFF}\x{1FC00}-\x{1FFFF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}]/u', '', $text);
+
+        // Залишаємо літери, цифри, пунктуацію і поширені спец-символи з назв товарів.
+        // \p{L} = літери, \p{N} = числа (включно з ² ³), \p{P} = пунктуація (лапки, дужки, дефіс, слеш...),
+        // \p{Sm} = мат. символи (×, +, ±, =), \p{So} = інші символи (°, ®, ™, ©, №).
+        $text = preg_replace('/[^\p{L}\p{N}\p{P}\p{Sm}\p{So}\s]/u', '', $text);
 
         return trim($text);
     }
