@@ -123,8 +123,8 @@ class ModelToolFindIQCron extends Model
                     if ($product['product_id_ext'] == $description['product_id']) {
                         $product['descriptions'][] = array(
                             'language_id' => $description['language_id'],
-                            'name'        => $this->sanitaze(htmlspecialchars_decode($description['name'])),
-                            'description' => $this->sanitaze( html_entity_decode(htmlspecialchars_decode($description['description']))),
+                            'name'        => $this->sanitaze(htmlspecialchars_decode($description['name'], ENT_QUOTES)),
+                            'description' => $this->sanitaze(html_entity_decode(htmlspecialchars_decode($description['description'], ENT_QUOTES))),
                             'language_code' => $description['language_code'],
                         );
                     }
@@ -493,7 +493,7 @@ class ModelToolFindIQCron extends Model
         $text = preg_replace('/[ ]{2,}/', ' ', $text);
 
         // Залишаємо лише літери, цифри і деякі розділові знаки
-        $text = preg_replace('/[^\p{L}\p{N}\s.,!?":;-]/u', '', $text);
+        $text = preg_replace('/[^\p{L}\p{N}\s.,!?\'":;\/()-]/u', '', $text);
 
         // Видаляємо емодзі (розширені діапазони Unicode для емодзі/піктограм)
         $text = preg_replace('/[\x{1F000}-\x{1FAFF}\x{1FC00}-\x{1FFFF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}]/u', '', $text);
