@@ -133,7 +133,7 @@ class ModelToolFindIQCron extends Model
                 foreach ($products_manufacturers as $manufacturer) {
                     if ($product['product_id_ext'] == $manufacturer['product_id']) {
                         $product['manufacturer'] = array(
-                            'name' => $manufacturer['name'],
+                            'name' => html_entity_decode($manufacturer['name'], ENT_QUOTES | ENT_HTML5, 'UTF-8'),
                             'descriptions' => array()
                         );
                     }
@@ -142,9 +142,9 @@ class ModelToolFindIQCron extends Model
                 foreach ($product_attributes as $attribute) {
                     if ($product['product_id_ext'] == $attribute['product_id']) {
                         $product['attributes'][] = array(
-                            'attribute_group' => $attribute['attribute_group'],
-                            'attribute_name' => $attribute['attribute_name'],
-                            'value' => $attribute['value'],
+                            'attribute_group' => html_entity_decode($attribute['attribute_group'], ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                            'attribute_name' => html_entity_decode($attribute['attribute_name'], ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                            'value' => html_entity_decode($attribute['value'], ENT_QUOTES | ENT_HTML5, 'UTF-8'),
                             'language_id' => $attribute['language_id'],
                         );
                     }
