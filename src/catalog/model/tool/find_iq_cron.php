@@ -365,7 +365,7 @@ class ModelToolFindIQCron extends Model
         foreach ($categories as &$category) {
             $response[$category['category_id']]['descriptions'][] = [
                 'language_id' => $category['language_id'],
-                'name' => $category['name'],
+                'name' => html_entity_decode($category['name'], ENT_QUOTES | ENT_HTML5, 'UTF-8'),
                 'language_code' => $category['language_code'],
             ];
         }
