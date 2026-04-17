@@ -1,0 +1,31 @@
+name: Build & Release OCMOD
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build OCMOD zip
+        run: bash build.sh
+
+      - name: Extract version from tag
+        id: version
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "Find-iQ OpenCart 3 — ${{ steps.version.outputs.tag }}"
+          files: find_iq.3.x.ocmod.zip
+          generate_release_notes: true
