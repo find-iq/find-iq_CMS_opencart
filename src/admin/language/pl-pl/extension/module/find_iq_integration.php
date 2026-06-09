@@ -45,6 +45,7 @@ $_['text_contacts_github']    = 'GitHub';
 $_['text_webhook_heading']  = 'Szybkie adresy webhooków';
 $_['text_webhook_help']     = 'Gotowe do skopiowania adresy URL z bieżącym tajnym tokenem.';
 $_['text_webhook_start_full'] = 'Start — pełna synchronizacja (nowe + zmienione + reindeks)';
+$_['text_webhook_full_reupload'] = 'Pełne przesłanie (resetuj + wyślij ponownie)';
 $_['text_webhook_start_fast'] = 'Start — szybka aktualizacja (tylko ceny i dostępność)';
 $_['text_webhook_status']     = 'Status';
 $_['text_webhook_stop']       = 'Stop';

@@ -76,8 +76,32 @@ class ControllerFindIqWebhook extends Controller
             $mode = 'fast';
         }
 
-        // 4. Lock check — prevent duplicate runs
         $lockFile = $this->getLockFile();
+        $stopFlag = DIR_STORAGE . 'find_iq_sync.stop';
+
+        // 4. If reset=1 — force-stop any running process before resetting state.
+        //    Without this, reset was silently ignored when a sync was already running.
+        if ($reset) {
+            // Signal the running worker to stop
+            file_put_contents($stopFlag, '1');
+
+            // Give the worker up to 2 seconds to notice the stop flag
+            if (is_file($lockFile)) {
+                $pid = (int)trim(file_get_contents($lockFile));
+                $waited = 0;
+                while ($pid > 0 && file_exists('/proc/' . $pid) && $waited < 2) {
+                    usleep(200000); // 0.2s
+                    $waited += 0.2;
+                }
+                @unlink($lockFile);
+            }
+
+            // Reset DB state — all products will be re-sent from scratch
+            $this->load->model('tool/find_iq_cron');
+            $this->model_tool_find_iq_cron->resetSyncState();
+        }
+
+        // 5. Lock check — prevent duplicate runs (skip when reset already cleared the lock)
         if (is_file($lockFile)) {
             $pid = (int)trim(file_get_contents($lockFile));
             if ($pid > 0 && file_exists('/proc/' . $pid)) {
@@ -92,14 +116,7 @@ class ControllerFindIqWebhook extends Controller
             @unlink($lockFile);
         }
 
-        // 5. Reset sync state if requested
-        if ($reset) {
-            $this->load->model('tool/find_iq_cron');
-            $this->model_tool_find_iq_cron->resetSyncState();
-        }
-
-        // 6. Clear stop flag if present (user called stop then start — start wins)
-        $stopFlag = DIR_STORAGE . 'find_iq_sync.stop';
+        // 6. Clear stop flag so the new worker is not blocked by the flag we wrote above
         if (is_file($stopFlag)) {
             @unlink($stopFlag);
         }
@@ -120,6 +137,10 @@ class ControllerFindIqWebhook extends Controller
         // points to catalog/) by stripping the trailing catalog/ segment.
         $cronFile = dirname(rtrim(DIR_APPLICATION, '/')) . '/cron/find_iq.php';
 
+        // Write full-clean marker so cron runs prepareTempTable with ghost cleanup
+        if ($reset) {
+            file_put_contents(DIR_STORAGE . 'find_iq_sync.reset', '1');
+        }
         // Write webhook marker so cron knows it was launched by webhook (not manual cron)
         file_put_contents(DIR_STORAGE . 'find_iq_sync.webhook', '1');
 

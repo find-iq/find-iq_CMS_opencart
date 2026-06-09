@@ -46,6 +46,7 @@ $_['text_contacts_github']    = 'GitHub';
 $_['text_webhook_heading']  = 'Quick webhook URLs';
 $_['text_webhook_help']     = 'Ready-to-copy URLs with your current secret token.';
 $_['text_webhook_start_full'] = 'Start — full sync (new + changed + reindex)';
+$_['text_webhook_full_reupload'] = 'Full re-upload (reset + re-sync everything)';
 $_['text_webhook_start_fast'] = 'Start — fast sync (prices & stock only)';
 $_['text_webhook_status']     = 'Status';
 $_['text_webhook_stop']       = 'Stop';

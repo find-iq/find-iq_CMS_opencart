@@ -418,8 +418,18 @@ class ModelToolFindIQCron extends Model
      *
      * @return void
      */
-    public function prepareTempTable(): void
+    public function prepareTempTable(bool $full_clean = false): void
     {
+        if ($full_clean) {
+            // Remove rows for products that no longer exist or are inactive
+            $this->db->query('
+                DELETE fs FROM ' . DB_PREFIX . 'find_iq_sync_products fs
+                LEFT JOIN ' . DB_PREFIX . 'product p ON p.product_id = fs.product_id
+                WHERE p.product_id IS NULL OR p.status = 0
+            ');
+        }
+
+        // Add new active products not yet in the sync table
         $this->db->query('
             INSERT IGNORE INTO ' . DB_PREFIX . 'find_iq_sync_products (product_id)
             SELECT p.product_id

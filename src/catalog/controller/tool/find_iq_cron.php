@@ -43,7 +43,12 @@ class ControllerToolFindIQCron extends Controller
             $this->load->model('tool/image');
             $this->load->model('tool/find_iq_cron');
 
-            $this->model_tool_find_iq_cron->prepareTempTable();
+            // full_clean=true when launched via reset=1 (webhook writes this marker)
+            $full_clean = is_file(DIR_STORAGE . 'find_iq_sync.reset');
+            if ($full_clean) {
+                @unlink(DIR_STORAGE . 'find_iq_sync.reset');
+            }
+            $this->model_tool_find_iq_cron->prepareTempTable($full_clean);
 
             if ($mode == 'fast') {
                 $offset_hours = $config['fast_reindex_timeout'] ?? 4;

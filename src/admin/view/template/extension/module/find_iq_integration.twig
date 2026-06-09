@@ -171,6 +171,7 @@
                             {% set webhook_links = {
                                 (text_webhook_start_full): webhook_secret ~ '&action=start&mode=full&actions=categories,products&batch_size=50',
                                 (text_webhook_start_fast): webhook_secret ~ '&action=start&mode=fast&actions=products&batch_size=50',
+                                (text_webhook_full_reupload): webhook_secret ~ '&action=start&mode=full&actions=categories,products&batch_size=50&reset=1',
                                 (text_webhook_status):     webhook_secret ~ '&action=status',
                                 (text_webhook_stop):       webhook_secret ~ '&action=stop',
                                 (text_webhook_frontend):   webhook_secret ~ '&action=frontend'
